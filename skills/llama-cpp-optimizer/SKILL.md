@@ -1,9 +1,6 @@
 ---
 name: llama-cpp-optimizer
 description: Launch optimized LLMs via llama.cpp with faster inference and lower VRAM consumption. Use when the user wants to run a local LLM via llama.cpp, tune inference parameters (context size, batch size, GPU layers, KV cache, MoE offload), determine the best model configuration for their hardware, or apply VRAM/RAM reduction hacks. Covers model selection, quantization, parameter derivation from model metadata + system capabilities, and execution via llama-cli/llama-server.
-allowed-tools:
-  - Bash(uvx:*) Bash(uv:*) Bash(llama-*) Bash(curl:*) Bash(powershell:*) Bash(wmic:*) Bash(nvidia-smi:*) Bash(Get-Command:*) Bash(Get-CimInstance:*)
-  - Read Edit Write Glob Grep
 ---
 
 # llama.cpp Optimizer
@@ -97,6 +94,7 @@ See [references/parameter-tuning.md](references/parameter-tuning.md) for detaile
 ### 4. Run the Model
 
 **Interactive chat:**
+
 ```bash
 llama-cli --hf-repo <user>/<model> --hf-file <file.gguf> \
   --ctx-size 64000 --flash-attn on \
@@ -105,6 +103,7 @@ llama-cli --hf-repo <user>/<model> --hf-file <file.gguf> \
 ```
 
 **OpenAI-compatible server:**
+
 ```bash
 llama-server --hf-repo <user>/<model> --hf-file <file.gguf> \
   --host 127.0.0.1 --port 8080 \
@@ -113,6 +112,7 @@ llama-server --hf-repo <user>/<model> --hf-file <file.gguf> \
 ```
 
 **MoE model (VRAM constrained):**
+
 ```bash
 llama-server --hf-repo <user>/<model> --hf-file <file.gguf> \
   --ctx-size 64000 --flash-attn on \
@@ -125,11 +125,11 @@ llama-server --hf-repo <user>/<model> --hf-file <file.gguf> \
 
 The `scripts/` directory contains three Python scripts that automate the parameter derivation workflow:
 
-| Script | Purpose | Usage |
-|--------|---------|-------|
-| `detect-system.py` | Detect system capabilities (GPU, RAM, CPU) | `uv run scripts/detect-system.py` |
-| `model-info.py` | Fetch model metadata from Hugging Face | `uv run scripts/model-info.py <model_id>` |
-| `derive-params.py` | Derive optimal llama.cpp parameters | `uv run scripts/derive-params.py --model -` |
+| Script             | Purpose                                    | Usage                                       |
+| ------------------ | ------------------------------------------ | ------------------------------------------- |
+| `detect-system.py` | Detect system capabilities (GPU, RAM, CPU) | `uv run scripts/detect-system.py`           |
+| `model-info.py`    | Fetch model metadata from Hugging Face     | `uv run scripts/model-info.py <model_id>`   |
+| `derive-params.py` | Derive optimal llama.cpp parameters        | `uv run scripts/derive-params.py --model -` |
 
 All scripts use inline dependencies (`# /// script` header) and run via `uv run` — no manual dependency management needed.
 
@@ -137,77 +137,82 @@ All scripts use inline dependencies (`# /// script` header) and run via `uv run`
 
 The derived parameters and run commands combine several techniques for faster inference and lower memory consumption:
 
-| Technique | Effect |
-|-----------|--------|
-| `--flash-attn on` | Faster attention, lower memory (esp. long contexts) |
-| `--cache-type-k/v q8_0/q4_0` | Quantize KV cache → lower VRAM, slight quality cost |
+| Technique                     | Effect                                                     |
+| ----------------------------- | ---------------------------------------------------------- |
+| `--flash-attn on`             | Faster attention, lower memory (esp. long contexts)        |
+| `--cache-type-k/v q8_0/q4_0`  | Quantize KV cache → lower VRAM, slight quality cost        |
 | `--cpu-moe` / `--n-cpu-moe N` | Keep MoE expert weights in CPU RAM → fit larger MoE models |
-| `--load-mode mmap` | Memory-map model file → lower RAM footprint, faster load |
-| `--n-gpu-layers N` | Offload the right number of layers to GPU |
-| `--tensor-split N0,N1,...` | Distribute across multiple GPUs |
+| `--load-mode mmap`            | Memory-map model file → lower RAM footprint, faster load   |
+| `--n-gpu-layers N`            | Offload the right number of layers to GPU                  |
+| `--tensor-split N0,N1,...`    | Distribute across multiple GPUs                            |
 
 See [references/moe-optimization.md](references/moe-optimization.md) for MoE-specific tuning and the derivation script for KV cache / layer-offload logic.
 
 ## Key llama.cpp Tools
 
-| Tool | Purpose |
-|------|---------|
-| `llama-cli` | Interactive chat or single-prompt text generation |
-| `llama-server` | HTTP server with OpenAI-compatible API |
-| `llama-bench` | Benchmark prompt processing and generation throughput |
-| `llama-perplexity` | Evaluate model perplexity on a text corpus |
-| `llama-quantize` | Quantize models to lower precision |
-| `llama-tokenize` | Tokenize/detokenize text, show token counts |
-| `llama-gguf-split` | Split or merge GGUF model files |
-| `llama-imatrix` | Compute importance matrix for quantization calibration |
+| Tool               | Purpose                                                |
+| ------------------ | ------------------------------------------------------ |
+| `llama-cli`        | Interactive chat or single-prompt text generation      |
+| `llama-server`     | HTTP server with OpenAI-compatible API                 |
+| `llama-bench`      | Benchmark prompt processing and generation throughput  |
+| `llama-perplexity` | Evaluate model perplexity on a text corpus             |
+| `llama-quantize`   | Quantize models to lower precision                     |
+| `llama-tokenize`   | Tokenize/detokenize text, show token counts            |
+| `llama-gguf-split` | Split or merge GGUF model files                        |
+| `llama-imatrix`    | Compute importance matrix for quantization calibration |
 
 See [references/llama-cli-reference.md](references/llama-cli-reference.md) for comprehensive CLI reference.
 
 ## Important Flags Reference
 
 ### Model Loading
-| Flag | Description |
-|------|-------------|
-| `--hf-repo <user>/<model>` | Hugging Face model repository (auto-downloads) |
-| `--hf-file <file.gguf>` | Specific GGUF file in the repo |
-| `--model <path>` | Local path to GGUF file |
-| `--load-mode <mode>` | `mmap` (default, memory-mapped), `mlock` (lock in RAM), `none` |
-| `--no-mmap` | Disable memory-mapping (slower load, less pageout risk) |
+
+| Flag                       | Description                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| `--hf-repo <user>/<model>` | Hugging Face model repository (auto-downloads)                 |
+| `--hf-file <file.gguf>`    | Specific GGUF file in the repo                                 |
+| `--model <path>`           | Local path to GGUF file                                        |
+| `--load-mode <mode>`       | `mmap` (default, memory-mapped), `mlock` (lock in RAM), `none` |
+| `--no-mmap`                | Disable memory-mapping (slower load, less pageout risk)        |
 
 ### Context & Performance
-| Flag | Description |
-|------|-------------|
-| `--ctx-size N` | Context size in tokens (default: model default, max: model's `max_position_embeddings`) |
-| `--flash-attn <on\|off\|auto>` | Flash Attention (default: auto) |
-| `--batch-size N` | Logical max batch size (default: 2048) |
-| `--ubatch-size N` | Physical max batch size (default: 512) |
-| `--threads N` | CPU threads for generation (default: CPU count) |
-| `--threads-batch N` | CPU threads for batch/prompt processing |
+
+| Flag                           | Description                                                                             |
+| ------------------------------ | --------------------------------------------------------------------------------------- |
+| `--ctx-size N`                 | Context size in tokens (default: model default, max: model's `max_position_embeddings`) |
+| `--flash-attn <on\|off\|auto>` | Flash Attention (default: auto)                                                         |
+| `--batch-size N`               | Logical max batch size (default: 2048)                                                  |
+| `--ubatch-size N`              | Physical max batch size (default: 512)                                                  |
+| `--threads N`                  | CPU threads for generation (default: CPU count)                                         |
+| `--threads-batch N`            | CPU threads for batch/prompt processing                                                 |
 
 ### GPU Offloading
-| Flag | Description |
-|------|-------------|
-| `--n-gpu-layers N` | Offload N layers to GPU (-1 = all, 0 = CPU only) |
-| `--cpu-moe` | Keep all MoE expert weights in CPU RAM |
-| `--n-cpu-moe N` | Keep MoE expert weights of first N layers in CPU (counts from highest-numbered layers) |
-| `--tensor-split N0,N1,...` | Fraction of model to offload to each GPU |
-| `--cache-type-k <type>` | KV cache data type for K (f16, q8_0, q4_0, etc.) |
-| `--cache-type-v <type>` | KV cache data type for V |
+
+| Flag                       | Description                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `--n-gpu-layers N`         | Offload N layers to GPU (-1 = all, 0 = CPU only)                                       |
+| `--cpu-moe`                | Keep all MoE expert weights in CPU RAM                                                 |
+| `--n-cpu-moe N`            | Keep MoE expert weights of first N layers in CPU (counts from highest-numbered layers) |
+| `--tensor-split N0,N1,...` | Fraction of model to offload to each GPU                                               |
+| `--cache-type-k <type>`    | KV cache data type for K (f16, q8_0, q4_0, etc.)                                       |
+| `--cache-type-v <type>`    | KV cache data type for V                                                               |
 
 ### Sampling
-| Flag | Description |
-|------|-------------|
-| `--temp N` | Temperature (0.0 = greedy, ~0.8 balanced, ~1.2 creative) |
-| `--top-p N` | Nucleus sampling cutoff (0.95 default, 1.0 = disabled) |
-| `--min-p N` | Minimum probability relative to top token (0.05 default, 0.0 = disabled) |
-| `--repeat-penalty N` | Repeat penalty (1.0 = none, 1.1 = mild) |
+
+| Flag                 | Description                                                              |
+| -------------------- | ------------------------------------------------------------------------ |
+| `--temp N`           | Temperature (0.0 = greedy, ~0.8 balanced, ~1.2 creative)                 |
+| `--top-p N`          | Nucleus sampling cutoff (0.95 default, 1.0 = disabled)                   |
+| `--min-p N`          | Minimum probability relative to top token (0.05 default, 0.0 = disabled) |
+| `--repeat-penalty N` | Repeat penalty (1.0 = none, 1.1 = mild)                                  |
 
 ### MoE-Specific
-| Flag | Description |
-|------|-------------|
-| `--cpu-moe` | Keep ALL MoE expert weights in CPU RAM |
-| `--n-cpu-moe N` | Keep first N layers' experts in CPU (reduce N to fit more on GPU) |
-| `--load-mode mmap` | Memory-map model file (essential for large MoE models) |
+
+| Flag               | Description                                                       |
+| ------------------ | ----------------------------------------------------------------- |
+| `--cpu-moe`        | Keep ALL MoE expert weights in CPU RAM                            |
+| `--n-cpu-moe N`    | Keep first N layers' experts in CPU (reduce N to fit more on GPU) |
+| `--load-mode mmap` | Memory-map model file (essential for large MoE models)            |
 
 See [references/moe-optimization.md](references/moe-optimization.md) for MoE-specific tuning.
 
