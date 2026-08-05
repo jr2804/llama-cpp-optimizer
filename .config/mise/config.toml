@@ -1,0 +1,22 @@
+[tools]
+# llama-cpp as portable installation
+"github:ggml-org/llama.cpp" = {version = "latest", asset_pattern = "llama-*-vulkan-*.*"}
+
+# other tools
+bun = "latest"
+"rumdl" = "latest"
+
+# web search tools
+"github:1broseidon/ketch" = "latest"
+"pipx:hound-mcp" = { version = "latest", extras = ["all"] }
+
+# python tools
+"pipx:git+https://codeberg.org/jr2804/clean-sort.git" = "latest"
+ruff = "latest"
+ty = "latest"
+
+[settings.npm]
+package_manager = "bun"
+
+[settings.pipx]
+uvx = true

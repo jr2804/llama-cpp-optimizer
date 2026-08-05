@@ -1,0 +1,11 @@
+[tasks.format-md]
+description = "Lint and reformat Markdown files with rumdl"
+run = "rumdl fmt --config .config/rumdl.toml src/ docs/ tests/ ./"
+
+[tasks.format]
+description = "Format code (ruff, isort, csort)"
+run = [
+	"csort run skills/ scripts/ --config .config/csort.toml",
+	"ruff format skills/ ",
+	"ruff check skills/ --select I --fix",
+]

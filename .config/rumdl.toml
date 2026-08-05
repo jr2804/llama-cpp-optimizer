@@ -1,0 +1,13 @@
+# rumdl configuration file for KNOX
+
+[global]
+# Maximum allowed line length (KNOX docs have long URLs and tables)
+line-length = 320
+
+# Markdown flavor/dialect: knox targets Obsidian by default
+flavor = "obsidian"
+
+[per-file-ignores]
+"README.md" = ["MD033", "MD013"]  # Allow long line length and HTML in README
+"docs/**/*.md" = ["MD013", "MD041"]  # Relax rules for generated docs
+"**/AGENTS.md" = ["MD013"]  # Allow long lines in AGENTS.md (agent-only files)

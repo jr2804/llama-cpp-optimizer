@@ -1,0 +1,49 @@
+# clean-sort configuration. See https://codeberg.org/jr2804/clean-sort
+
+[module]
+# Ordered list of section buckets; top-level statements are grouped into these.
+sections = ["imports", "typing_imports", "module_constants", "runtime_setup", "enums", "dataclasses", "classes", "functions", "main_block"]
+
+[strategy]
+# Per-section in-section strategy: keep | alpha | stepdown | abstraction.
+enums = "alpha"
+# Strategy for the functions section (stepdown/abstraction only affect functions/classes).
+functions = "stepdown"
+# Strategy for the classes section.
+# classes = "keep"
+
+[class_methods]
+# Reorder methods within each class (undersort).
+enabled = true
+# Method visibility ordering.
+order = ["public", "protected", "private"]
+# Method-type ordering within each visibility bucket.
+method_type_order = ["instance", "class", "static"]
+
+[classification]
+# Regex for the module_constants classification.
+# constants_pattern = "^[A-Z_][A-Z0-9_]*$"
+
+[transforms]
+# Move imports nested inside function/class bodies to the top of the module.
+hoist_inline_imports = true
+# Delete if TYPE_CHECKING: guards and hoist the imports they contained.
+remove_type_checking = true
+
+[cli]
+# Exit non-zero when csort run modifies files (pre-commit/CI friendly).
+fail_on_changed = false
+# Content-hash skip cache: avoids re-parsing already-sorted files.
+# cache = true
+# Cache directory (default: ~/.cache/csort/<project-slug>/cache.json).
+# cache_dir = ".csort-cache"
+# Parallel workers: 0 = serial, negative = auto (int(0.75*cpu_count())).
+jobs = -1
+# Parallel backend: 'process' (multiprocessing) or 'thread' (threading).
+# parallel_backend = "process"
+
+[discovery]
+# Glob patterns to exclude during file discovery (merged with --exclude flags).
+# exclude = []
+# Whether file discovery descends into subdirectories (--no-recursive overrides).
+recursive = true

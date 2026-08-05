@@ -1,0 +1,17 @@
+[tasks.add-skills]
+description = "Install agent skills for AI assistants"
+run = [
+    # Python coding
+    "bun x skills add https://github.com/jr2804/prompts -s python-ultimate -a universal -y",
+	"bun x skills add https://github.com/s2005/uv-skill -a universal -y",
+
+    # search tools
+    "bun x skills add 1broseidon/ketch -s ketch -a universal -y",
+
+    # documentation skills
+	"bun x skills add https://github.com/nicobailon/visual-explainer -a universal -y",
+	"bun x skills add plannotator/effective-html -a universal -y",
+	"bun x skills add hoodini/ai-agents-skills -s mermaid-diagrams -a universal -y",
+	"bun x skills add dkyazzentwatwa/chatgpt-skills -s svg-precision-skill -a universal -y",
+    "bun x skills add oil-oil/beautify-github-readme -a universal -y",
+]
