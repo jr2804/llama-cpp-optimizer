@@ -1,5 +1,4 @@
 # Local, machine-specific config
-.config/
 .agents/
 skills-lock.json
 
@@ -10,3 +9,6 @@ __pycache__/
 # Model files
 *.gguf
 models/
+
+# misc.
+tmp/
