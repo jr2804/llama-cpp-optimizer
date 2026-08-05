@@ -15,8 +15,7 @@ import json
 import platform
 import subprocess
 import sys
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
@@ -43,21 +42,24 @@ class SystemInfo:
     cpu_name: str = ""
     cpu_architecture: str = ""
     ram_speed_mhz: int = 0
+    cpu_cores_physical: int = 0
     disk_free_gb: float = 0.0
 
 
-def run_powershell(script: str) -> str:
-    """Run a PowerShell command and return stdout."""
-    try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", script],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return ""
+def main() -> None:
+    """Detect system capabilities and print as JSON."""
+    info = SystemInfo()
+    info.platform = sys.platform
+    info.os_version = platform.version()
+
+    detect_gpu_nvidia(info)
+    detect_gpu_wmi(info)
+    detect_ram(info)
+    detect_cpu(info)
+    detect_disk(info)
+    detect_cpu_physical(info)
+
+    print(json.dumps(asdict(info), indent=2))
 
 
 def detect_gpu_nvidia(info: SystemInfo) -> None:
@@ -72,6 +74,7 @@ def detect_gpu_nvidia(info: SystemInfo) -> None:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         for line in result.stdout.strip().splitlines():
             parts = [p.strip() for p in line.split(",")]
@@ -95,7 +98,7 @@ def detect_gpu_wmi(info: SystemInfo) -> None:
         return  # already have NVIDIA info
     output = run_powershell(
         "Get-CimInstance Win32_VideoController | "
-        'Select-Object Name, AdapterRAM | ConvertTo-Json -Compress'
+        "Select-Object Name, AdapterRAM | ConvertTo-Json -Compress"
     )
     if not output:
         return
@@ -114,25 +117,17 @@ def detect_gpu_wmi(info: SystemInfo) -> None:
             name_lower = name.lower()
             if "nvidia" in name_lower:
                 backend = "cuda"
-            elif "amd" in name_lower or "radeon" in name_lower:
+            elif "amd" in name_lower or "radeon" in name_lower or "intel" in name_lower:
                 backend = "vulkan"
-            elif "intel" in name_lower:
-                backend = "vulkan"
-            info.gpus.append(
-                GpuInfo(name=name, vram_total_mb=vram_mb, backend=backend)
-            )
+            info.gpus.append(GpuInfo(name=name, vram_total_mb=vram_mb, backend=backend))
     except (json.JSONDecodeError, KeyError):
         pass
 
 
 def detect_ram(info: SystemInfo) -> None:
     """Detect total and free RAM."""
-    total = run_powershell(
-        "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory"
-    )
-    free = run_powershell(
-        "(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory"
-    )
+    total = run_powershell("(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory")
+    free = run_powershell("(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory")
     try:
         if total:
             info.ram_total_gb = round(int(total) / (1024**3), 1)
@@ -146,7 +141,7 @@ def detect_ram(info: SystemInfo) -> None:
 
 
 def detect_cpu(info: SystemInfo) -> None:
-    """Detect CPU information."""
+    """Detect CPU information (logical core count)."""
     cores = run_powershell("[Environment]::ProcessorCount")
     name = run_powershell("(Get-CimInstance Win32_Processor).Name")
     arch = run_powershell("(Get-CimInstance Win32_Processor).Architecture")
@@ -172,6 +167,16 @@ def detect_cpu(info: SystemInfo) -> None:
         pass
 
 
+def detect_cpu_physical(info: SystemInfo) -> None:
+    """Detect physical core count via Win32_Processor."""
+    physical = run_powershell("(Get-CimInstance Win32_Processor).NumberOfCores")
+    try:
+        if physical:
+            info.cpu_cores_physical = int(physical)
+    except ValueError:
+        pass
+
+
 def detect_disk(info: SystemInfo) -> None:
     """Detect free disk space on C:."""
     free = run_powershell(
@@ -185,19 +190,19 @@ def detect_disk(info: SystemInfo) -> None:
         pass
 
 
-def main() -> None:
-    """Detect system capabilities and print as JSON."""
-    info = SystemInfo()
-    info.platform = sys.platform
-    info.os_version = platform.version()
-
-    detect_gpu_nvidia(info)
-    detect_gpu_wmi(info)
-    detect_ram(info)
-    detect_cpu(info)
-    detect_disk(info)
-
-    print(json.dumps(asdict(info), indent=2))
+def run_powershell(script: str) -> str:
+    """Run a PowerShell command and return stdout."""
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return ""
 
 
 if __name__ == "__main__":

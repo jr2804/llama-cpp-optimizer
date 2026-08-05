@@ -16,11 +16,10 @@ Outputs structured JSON with model architecture metadata.
 import json
 import re
 import sys
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
-import httpx
+import httpx  # type: ignore
 
 
 @dataclass
@@ -46,6 +45,33 @@ class ModelInfo:
     gguf_files: list[dict[str, Any]] = field(default_factory=list)
 
 
+def main() -> None:
+    """Main entry point."""
+    if len(sys.argv) < 2:
+        print(
+            "Usage: uv run model-info.py <model_id_or_url> [--list-files]",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    input_str = sys.argv[1]
+    list_files = "--list-files" in sys.argv
+
+    try:
+        model_id = parse_model_id(input_str)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    with httpx.Client() as client:
+        info = extract_model_info(model_id, client)
+
+        if list_files:
+            info.gguf_files = list_gguf_files(model_id, client)
+
+        print(json.dumps(asdict(info), indent=2, default=str))
+
+
 def parse_model_id(input_str: str) -> str:
     """Parse a model ID from a URL or short form."""
     # Full URL: https://huggingface.co/org/model
@@ -56,24 +82,6 @@ def parse_model_id(input_str: str) -> str:
     if "/" in input_str and not input_str.startswith("http"):
         return input_str
     raise ValueError(f"Could not parse model ID from: {input_str}")
-
-
-def fetch_json(url: str, client: httpx.Client) -> dict[str, Any] | None:
-    """Fetch JSON from a URL, return None on failure."""
-    try:
-        resp = client.get(url, timeout=15, follow_redirects=True)
-        resp.raise_for_status()
-        return resp.json()
-    except (httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError):
-        return None
-
-
-def extract_text_config(config: dict[str, Any]) -> dict[str, Any]:
-    """Extract the text config (handles vision-language models with nested text_config)."""
-    tc = config.get("text_config", config)
-    if isinstance(tc, str):
-        return config
-    return tc
 
 
 def extract_model_info(model_id: str, client: httpx.Client) -> ModelInfo:
@@ -91,7 +99,11 @@ def extract_model_info(model_id: str, client: httpx.Client) -> ModelInfo:
         info.num_attention_heads = tc.get("num_attention_heads", 0)
         info.num_key_value_heads = tc.get("num_key_value_heads", 0)
         info.hidden_size = tc.get("hidden_size", 0)
-        info.intermediate_size = tc.get("intermediate_size", 0) or tc.get("moe_intermediate_size", 0) or tc.get("shared_expert_intermediate_size", 0)
+        info.intermediate_size = (
+            tc.get("intermediate_size", 0)
+            or tc.get("moe_intermediate_size", 0)
+            or tc.get("shared_expert_intermediate_size", 0)
+        )
         info.head_dim = tc.get("head_dim", 0)
         info.max_position_embeddings = tc.get("max_position_embeddings", 0)
         info.vocab_size = tc.get("vocab_size", 0)
@@ -119,6 +131,14 @@ def extract_model_info(model_id: str, client: httpx.Client) -> ModelInfo:
     return info
 
 
+def extract_text_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Extract the text config (handles vision-language models with nested text_config)."""
+    tc = config.get("text_config", config)
+    if isinstance(tc, str):
+        return config
+    return tc
+
+
 def list_gguf_files(model_id: str, client: httpx.Client) -> list[dict[str, Any]]:
     """List GGUF files in a model repository."""
     api_url = f"https://huggingface.co/api/models/{model_id}"
@@ -139,28 +159,11 @@ def list_gguf_files(model_id: str, client: httpx.Client) -> list[dict[str, Any]]
     return files
 
 
-def main() -> None:
-    """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: uv run model-info.py <model_id_or_url> [--list-files]", file=sys.stderr)
-        sys.exit(1)
-
-    input_str = sys.argv[1]
-    list_files = "--list-files" in sys.argv
-
-    try:
-        model_id = parse_model_id(input_str)
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    with httpx.Client() as client:
-        info = extract_model_info(model_id, client)
-
-        if list_files:
-            info.gguf_files = list_gguf_files(model_id, client)
-
-        print(json.dumps(asdict(info), indent=2, default=str))
+def fetch_json(url: str, client: httpx.Client) -> dict[str, Any]:
+    """Fetch JSON from a URL; raises on failure."""
+    resp = client.get(url, timeout=15, follow_redirects=True)
+    resp.raise_for_status()
+    return resp.json()
 
 
 if __name__ == "__main__":

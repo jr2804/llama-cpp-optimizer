@@ -148,73 +148,26 @@ The derived parameters and run commands combine several techniques for faster in
 
 See [references/moe-optimization.md](references/moe-optimization.md) for MoE-specific tuning and the derivation script for KV cache / layer-offload logic.
 
-## Key llama.cpp Tools
+## llama.cpp vs. Alternatives
 
-| Tool               | Purpose                                                |
-| ------------------ | ------------------------------------------------------ |
-| `llama-cli`        | Interactive chat or single-prompt text generation      |
-| `llama-server`     | HTTP server with OpenAI-compatible API                 |
-| `llama-bench`      | Benchmark prompt processing and generation throughput  |
-| `llama-perplexity` | Evaluate model perplexity on a text corpus             |
-| `llama-quantize`   | Quantize models to lower precision                     |
-| `llama-tokenize`   | Tokenize/detokenize text, show token counts            |
-| `llama-gguf-split` | Split or merge GGUF model files                        |
-| `llama-imatrix`    | Compute importance matrix for quantization calibration |
+| Framework        | Best For                                          | When to Choose Instead |
+|------------------|---------------------------------------------------|------------------------|
+| **llama.cpp**    | CPU, Apple Silicon, AMD/Intel GPUs, edge devices  | You have NVIDIA A100/H100 → use TensorRT-LLM |
+|                  | GGUF quantization (1.5–8 bit)                     | You need 100K+ tok/s throughput → use TensorRT-LLM |
+|                  | Simple deployment without Docker/Python           | You need PagedAttention + Python API → use vLLM |
+| **TensorRT-LLM** | NVIDIA datacenter GPUs (A100, H100)               | You're on CPU/Apple Silicon → use llama.cpp |
+| **vLLM**         | NVIDIA GPUs with Python-first API                 | You need maximum throughput → use TensorRT-LLM |
 
-See [references/llama-cli-reference.md](references/llama-cli-reference.md) for comprehensive CLI reference.
+## References
 
-## Important Flags Reference
-
-### Model Loading
-
-| Flag                       | Description                                                    |
-| -------------------------- | -------------------------------------------------------------- |
-| `--hf-repo <user>/<model>` | Hugging Face model repository (auto-downloads)                 |
-| `--hf-file <file.gguf>`    | Specific GGUF file in the repo                                 |
-| `--model <path>`           | Local path to GGUF file                                        |
-| `--load-mode <mode>`       | `mmap` (default, memory-mapped), `mlock` (lock in RAM), `none` |
-| `--no-mmap`                | Disable memory-mapping (slower load, less pageout risk)        |
-
-### Context & Performance
-
-| Flag                           | Description                                                                             |
-| ------------------------------ | --------------------------------------------------------------------------------------- |
-| `--ctx-size N`                 | Context size in tokens (default: model default, max: model's `max_position_embeddings`) |
-| `--flash-attn <on\|off\|auto>` | Flash Attention (default: auto)                                                         |
-| `--batch-size N`               | Logical max batch size (default: 2048)                                                  |
-| `--ubatch-size N`              | Physical max batch size (default: 512)                                                  |
-| `--threads N`                  | CPU threads for generation (default: CPU count)                                         |
-| `--threads-batch N`            | CPU threads for batch/prompt processing                                                 |
-
-### GPU Offloading
-
-| Flag                       | Description                                                                            |
-| -------------------------- | -------------------------------------------------------------------------------------- |
-| `--n-gpu-layers N`         | Offload N layers to GPU (-1 = all, 0 = CPU only)                                       |
-| `--cpu-moe`                | Keep all MoE expert weights in CPU RAM                                                 |
-| `--n-cpu-moe N`            | Keep MoE expert weights of first N layers in CPU (counts from highest-numbered layers) |
-| `--tensor-split N0,N1,...` | Fraction of model to offload to each GPU                                               |
-| `--cache-type-k <type>`    | KV cache data type for K (f16, q8_0, q4_0, etc.)                                       |
-| `--cache-type-v <type>`    | KV cache data type for V                                                               |
-
-### Sampling
-
-| Flag                 | Description                                                              |
-| -------------------- | ------------------------------------------------------------------------ |
-| `--temp N`           | Temperature (0.0 = greedy, ~0.8 balanced, ~1.2 creative)                 |
-| `--top-p N`          | Nucleus sampling cutoff (0.95 default, 1.0 = disabled)                   |
-| `--min-p N`          | Minimum probability relative to top token (0.05 default, 0.0 = disabled) |
-| `--repeat-penalty N` | Repeat penalty (1.0 = none, 1.1 = mild)                                  |
-
-### MoE-Specific
-
-| Flag               | Description                                                       |
-| ------------------ | ----------------------------------------------------------------- |
-| `--cpu-moe`        | Keep ALL MoE expert weights in CPU RAM                            |
-| `--n-cpu-moe N`    | Keep first N layers' experts in CPU (reduce N to fit more on GPU) |
-| `--load-mode mmap` | Memory-map model file (essential for large MoE models)            |
-
-See [references/moe-optimization.md](references/moe-optimization.md) for MoE-specific tuning.
+- [quantization-guide.md](references/quantization-guide.md) — GGUF formats, model size scaling, imatrix calibration
+- [optimization-guide.md](references/optimization-guide.md) — Thread tuning, GPU offload strategy, context memory
+- [server-tuning.md](references/server-tuning.md) — Concurrency, continuous batching, metrics, load balancing
+- [llama-cli-reference.md](references/llama-cli-reference.md) — Comprehensive CLI flag reference
+- [hf-model-info.md](references/hf-model-info.md) — Retrieving model metadata from Hugging Face
+- [system-capabilities.md](references/system-capabilities.md) — Detecting local system capabilities
+- [parameter-tuning.md](references/parameter-tuning.md) — Deriving optimal parameters from model + system
+- [moe-optimization.md](references/moe-optimization.md) — MoE-specific optimization guide
 
 ## Model Download
 
