@@ -14,6 +14,7 @@ bun = "latest"
 "pipx:git+https://codeberg.org/jr2804/clean-sort.git" = "latest"
 ruff = "latest"
 ty = "latest"
+"pipx:codespell" = "latest"
 
 [settings.npm]
 package_manager = "bun"

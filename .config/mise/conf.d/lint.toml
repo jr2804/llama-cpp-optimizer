@@ -1,0 +1,11 @@
+[tasks.lint]
+description = "Run linter (ruff)"
+run = 'ruff check skills/ --fix --unsafe-fixes'
+
+[tasks.typecheck]
+description = "Run type checker (ty)"
+run = 'ty check skills/'
+
+[tasks.spell]
+description = "Run spell checker (codespell)"
+run = "codespell skills/"

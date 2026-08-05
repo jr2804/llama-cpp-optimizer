@@ -12,3 +12,6 @@ models/
 
 # misc.
 tmp/
+
+# secrets/local-only config
+mise.local.toml
