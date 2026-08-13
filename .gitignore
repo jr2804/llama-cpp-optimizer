@@ -15,3 +15,6 @@ tmp/
 
 # secrets/local-only config
 mise.local.toml
+/.vscode
+# service logs
+logs/

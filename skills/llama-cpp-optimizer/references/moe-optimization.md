@@ -10,6 +10,7 @@ MoE models have two types of parameters:
 2. **Expert parameters** — routed per token: only a subset is active at any time
 
 For Qwen3.6-35B-A3B:
+
 - 256 total experts, only **8 active per token** (~3% of expert params used per step)
 - ~35B total parameters, but only ~3B active per token
 - The model file is ~19 GB (Q4_K_M) or ~21 GB (MXFP4), but only ~3B params need GPU compute
@@ -66,7 +67,7 @@ llama-server --model model.gguf --load-mode mlock
 
 For Qwen3.6-35B-A3B (MXFP4, ~21 GB file):
 
-### With `--cpu-moe`:
+### With `--cpu-moe`
 
 | Component | Size | Location |
 |-----------|------|----------|
@@ -77,7 +78,7 @@ For Qwen3.6-35B-A3B (MXFP4, ~21 GB file):
 | **Total GPU** | **~4.9 GB** | **Fits in 6 GB** |
 | Inactive expert weights (248/256) | ~17 GB | CPU (mmap) |
 
-### Without `--cpu-moe` (all on GPU):
+### Without `--cpu-moe` (all on GPU)
 
 | Component | Size | Location |
 |-----------|------|----------|
@@ -109,6 +110,7 @@ With `--cpu-moe`, expert weights are fetched from CPU RAM on demand. The speed d
 ```
 
 The CPU needs to:
+
 1. Fetch expert weights from RAM
 2. Run the expert FFN computation
 3. Route the next token's experts

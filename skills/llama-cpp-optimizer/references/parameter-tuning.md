@@ -41,16 +41,18 @@ The goal is to maximize throughput (tokens/second) while staying within hardware
 
 ### Model Weight Size
 
-```
+```text
 model_weights = file_size  (for GGUF, this is exact)
 ```
 
 For estimation without downloading:
-```
+
+```text
 model_weights ≈ total_parameters * bytes_per_param
 ```
 
 Where `bytes_per_param` by quantization:
+
 | Quant | Bytes/param |
 |-------|-------------|
 | BF16/FP16 | 2.0 |
@@ -67,12 +69,13 @@ Where `bytes_per_param` by quantization:
 
 ### KV Cache Size
 
-```
+```text
 KV_cache_per_token = 2 * num_hidden_layers * num_key_value_heads * head_dim * bytes_per_value
 Total_KV_cache = KV_cache_per_token * ctx_size
 ```
 
 Where `bytes_per_value`:
+
 | Cache type | Bytes/value |
 |------------|-------------|
 | `f16` | 2 |
@@ -87,26 +90,29 @@ Add ~10% overhead for buffers, activations, and temporary tensors.
 
 ### Total VRAM Required (GPU offload)
 
-```
+```text
 VRAM_needed = model_weights_on_gpu + KV_cache + overhead
 ```
 
 Where `model_weights_on_gpu` depends on `--n-gpu-layers`:
-```
+
+```text
 model_weights_on_gpu = (n_gpu_layers / total_layers) * model_weights
 ```
 
 For MoE with `--cpu-moe`:
-```
+
+```text
 model_weights_on_gpu = dense_weights + (num_experts_per_tok / num_experts) * expert_weights
 ```
+
 This is much smaller than the full model file size.
 
 ## Step 3: Derive Parameters
 
 ### Context Size (`--ctx-size`)
 
-```
+```text
 max_ctx = min(
     model_max_position_embeddings,
     floor((free_RAM * 0.75) / KV_cache_per_token)
@@ -114,6 +120,7 @@ max_ctx = min(
 ```
 
 **Guidelines:**
+
 - Start with 64000 for most models (good balance)
 - Reduce to 32000 if VRAM constrained
 - Increase to 128000+ if you have 24 GB+ VRAM and the model supports it
@@ -121,17 +128,19 @@ max_ctx = min(
 
 ### GPU Layers (`--n-gpu-layers`)
 
-```
+```text
 max_layers = floor(total_layers * (free_VRAM - KV_cache - overhead) / model_weights)
 ```
 
 **Practical approach:**
+
 1. Start with `--n-gpu-layers -1` (all layers on GPU)
 2. If it crashes (OOM), reduce by 10 layers
 3. Repeat until it loads
 4. For MoE with `--cpu-moe`, start with `--n-gpu-layers 20` and tune
 
 **Rule of thumb:**
+
 | Model size | 6 GB VRAM | 8 GB VRAM | 12 GB VRAM | 24 GB VRAM |
 |------------|-----------|-----------|------------|------------|
 | 3B dense | -1 (all) | -1 (all) | -1 (all) | -1 (all) |
@@ -161,7 +170,7 @@ max_layers = floor(total_layers * (free_VRAM - KV_cache - overhead) / model_weig
 
 ### Threads (`--threads`)
 
-```
+```text
 --threads = CPU_physical_cores  (not logical cores with hyperthreading)
 --threads-batch = CPU_physical_cores  (or slightly less for prompt processing)
 ```
@@ -208,16 +217,23 @@ llama-cli --model model.gguf --n-gpu-layers N --flash-attn on \
 ```
 
 **Target speeds:**
+
 - Prompt processing: > 1000 tokens/s (GPU), > 100 tokens/s (CPU)
 - Text generation: > 10 tokens/s (acceptable), > 30 tokens/s (good), > 50 tokens/s (excellent)
 
 ## Quick Reference Card
 
-```
-VRAM < 4 GB:  --n-gpu-layers 0 --cache-type-k q4_0 --cache-type-v q4_0 --ctx-size 32000
-VRAM 4-8 GB:  --n-gpu-layers 20 --cache-type-k q4_0 --cache-type-v q4_0 --ctx-size 64000
-VRAM 8-16 GB: --n-gpu-layers 30 --cache-type-k f16 --cache-type-v f16 --ctx-size 64000
-VRAM > 16 GB: --n-gpu-layers -1 --cache-type-k f16 --cache-type-v f16 --ctx-size 128000
+**Default: let `--fit` auto-tune offload** (it's on by default). Only set `--n-gpu-layers` explicitly for MoE CPU-expert splits or when `--fit` picks poorly.
+
+```text
+Any VRAM:    --fit on (default) --cache-type-k q4_0 --cache-type-v q4_0 --ctx-size 32768
+             (omit --n-gpu-layers so --fit can tune it)
+
+# Fallback: explicit offload (disables --fit)
+VRAM < 4 GB:  --n-gpu-layers 0  --cache-type-k q4_0 --cache-type-v q4_0 --ctx-size 8192
+VRAM 4-8 GB:  --n-gpu-layers 20 --cache-type-k q4_0 --cache-type-v q4_0 --ctx-size 32768
+VRAM 8-16 GB: --n-gpu-layers 30 --cache-type-k f16  --cache-type-v f16  --ctx-size 64000
+VRAM > 16 GB: --n-gpu-layers -1 --cache-type-k f16  --cache-type-v f16  --ctx-size 128000
 
 MoE + VRAM < 8 GB: add --cpu-moe --load-mode mmap
 MoE + VRAM 8-16 GB: try --n-cpu-moe 30 (reduce until it fits)

@@ -80,7 +80,7 @@ All use inline dependencies (`# /// script` header) and run via `uv run` — no 
 
 The project follows the [Agent Skills](https://agentskills.io) spec:
 
-```
+```text
 skills/llama-cpp-optimizer/
 ├── SKILL.md
 ├── scripts/

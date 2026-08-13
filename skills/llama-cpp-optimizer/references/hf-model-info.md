@@ -85,7 +85,8 @@ curl -sL "https://huggingface.co/<user>/<model>/raw/main/<file.gguf>"
 ```
 
 Returns:
-```
+
+```text
 version https://git-lfs.github.com/spec/v1
 oid sha256:a3a730920068d8c102238364c3fd415d89bc1c4a2f2d03960249b299d67522c5
 size 20261569888
@@ -144,7 +145,7 @@ Determine the model architecture from `config.json`:
 
 ### Dense Model Size
 
-```
+```text
 model_size_bytes = vocab_size * hidden_size * 2  (embedding)
                  + num_hidden_layers * (
                      hidden_size * intermediate_size * 4  (FFN gate/up/down)
@@ -167,10 +168,11 @@ Rough estimate: `parameters * bytes_per_param * quantization_factor`
 ### MoE Model Size
 
 MoE models have two components:
+
 - **Dense params** (attention, embeddings, shared experts): always loaded
 - **Expert params** (routed experts): only active experts per token need compute, but all experts must be in RAM/VRAM
 
-```
+```text
 total_size = dense_params + num_experts * expert_params_per_expert
 active_per_token = dense_params + num_experts_per_tok * expert_params_per_expert
 ```

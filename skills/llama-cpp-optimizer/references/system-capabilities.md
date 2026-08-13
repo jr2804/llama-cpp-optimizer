@@ -18,6 +18,7 @@ powershell -Command "Get-CimInstance Win32_VideoController | Select-Object Name,
 ```
 
 **Key values to extract:**
+
 - GPU name (e.g., "NVIDIA GeForce RTX 3060 Laptop GPU")
 - Total VRAM (e.g., 6144 MB = 6 GB)
 - Free VRAM (e.g., 5120 MB)
@@ -115,18 +116,19 @@ Write-Host ('  Name:  {0}' -f (Get-CimInstance Win32_Processor).Name)
 
 The KV cache size depends on context size, model architecture, and cache type:
 
-```
+```text
 KV_cache_bytes = 2 * num_layers * ctx_size * (num_kv_heads * head_dim) * bytes_per_value
 ```
 
 Where `bytes_per_value` depends on cache type:
+
 - `f16`: 2 bytes
 - `q8_0`: 1 byte
 - `q4_0`: 0.5 bytes
 
 ### Example: Qwen3.6-35B-A3B at 64K context
 
-```
+```text
 num_layers = 40
 num_kv_heads = 2
 head_dim = 256

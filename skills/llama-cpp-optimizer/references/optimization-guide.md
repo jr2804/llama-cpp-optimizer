@@ -25,23 +25,52 @@ make LLAMA_OPENBLAS=1
 
 ## GPU Layer Offloading
 
-Offload transformer layers to GPU for maximum throughput. The strategy:
+Offload transformer layers to GPU for maximum throughput.
+
+### Let `--fit` do it (default, recommended)
+
+`llama-server` and `llama-cli` ship with `--fit on` **enabled by default**. It auto-tunes `n-gpu-layers` (and can shrink `--ctx-size` down to `--fit-ctx`, default 4096) to fit device memory, leaving a safety margin (`--fit-target`, default 1024 MiB).
 
 ```bash
-# Start with full offload
-./llama-cli -m model.gguf -ngl 999
-
-# If OOM, reduce by 5 until it fits
-./llama-cli -m model.gguf -ngl 995
-# ...
-./llama-cli -m model.gguf -ngl 980
+# Just set ctx and let fit pick the offload — works for any model/card combo
+llama-server -m model.gguf -c 32768          # --fit on is the default
 ```
 
-**Hybrid mode** (partial offload):
+**Setting `-ngl` explicitly disables `--fit` for that run** — you'll see:
+```
+W common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 99, abort
+```
+Only hardcode `-ngl` when you need a specific split (e.g. MoE experts in RAM via `--cpu-moe`).
+
+### The VRAM budget: weights + KV cache + overhead
+
+OOM at load is almost always the **KV cache**, not the weights. A 7 GiB model on an 8 GiB card can still OOM if the context window is large — KV cache scales linearly with `--ctx-size` and with `layers × kv_heads × head_dim`. Full offload may fit at 4K ctx but OOM at 32K. Reduce ctx before reducing offload.
+
+### Empirical: more GPU is almost always faster, even with unsupported ops
+
+Hybrid-attention models (e.g. Ternary-Bonsai 27B, ~75% linear/delta-net attention) emit warnings on some backends:
+```
+W resolve_fused_ops: fused Gated Delta Net (chunked) not supported, set to disabled
+```
+It's tempting to force those layers to CPU where the kernel works. **Don't** — measured on RTX A2000 8GB (Vulkan), Ternary-Bonsai-27B Q2_0_g64:
+
+| offload | pp64 (t/s) | tg32 (t/s) |
+|---------|-----------|-----------|
+| ngl=0 (all CPU) | 7.6 | 1.4 |
+| ngl=50 | 78 | 3.5 |
+| `--fit` (auto) | 57 | **4.6** |
+
+The unfused GPU fallback path still beats CPU by 2–3× on token generation, 10× on prompt processing. The one wrinkle: **maxing out offload can slow generation** if it leaves no VRAM headroom for activation buffers — `--fit`'s conservative split won on tg (4.6 vs 3.5) even though it offloaded fewer layers. When in doubt, bench both.
+
+### Manual tuning (when `--fit` is wrong)
 
 ```bash
-# Offload 20 of 40 layers — GPU + CPU split
-./llama-cli -m llama-70b.Q4_K_M.gguf -ngl 20
+# Binary search for the max ngl that fits at your ctx
+for ngl in 99 80 60 40 20; do
+  llama-server -m model.gguf -c 32768 --n-gpu-layers $ngl --port 8012 --host 127.0.0.1 \
+    && echo "ngl=$ngl OK" || echo "ngl=$ngl OOM"
+  pkill -f "port 8012"
+done
 ```
 
 Monitor VRAM in real time:
@@ -89,6 +118,22 @@ Context size directly affects memory usage. The relationship is approximately li
 | 64K | ~32 GB |
 
 Adjust `--cache-type-k` and `--cache-type-v` to `q4_0` to halve KV cache memory at a small quality cost.
+
+## Measuring: `llama-bench`
+
+Don't guess — bench. `llama-bench` loads the model once per config and reports prompt-processing (`pp`) and token-generation (`tg`) throughput. Compare offload levels, ctx sizes, or cache types in one run:
+
+```bash
+# Compare offload levels for a model that won't fully fit
+llama-bench -m model.gguf -p 64 -n 32 -ngl 99 -ngl 50 -ngl 0 -t 16
+
+# Compare KV cache quantization
+llama-bench -m model.gguf -p 512 -n 128 -ctk f16 -ctk q4_0
+```
+
+`pp` (prompt processing) is compute-bound and matters for long inputs. `tg` (token generation) is memory-bandwidth-bound and is what you feel in interactive chat — **optimize tg for chat, pp for batch/RAG**. Numbers are noisy (±10%); run with multiple `-r` repeats if you need stable comparisons.
+
+Each `-ngl` value triggers a full model reload (~30–60s for a 7 GB model), so bench a few targeted values, not a sweep.
 
 ## Performance Benchmarks (Reference)
 

@@ -7,6 +7,7 @@ Comprehensive reference for llama.cpp command-line tools. Covers all flags group
 These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most other tools.
 
 ### Model Loading
+
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-m, --model <path>` | Path to GGUF model file | (required) |
@@ -19,6 +20,7 @@ These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most oth
 | `--no-mmap` | DEPRECATED: use `--load-mode none` | — |
 
 ### Context & Generation
+
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-c, --ctx-size N` | Prompt context size in tokens | model default |
@@ -33,6 +35,7 @@ These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most oth
 | `--swa-full` | Use full-size SWA cache | false |
 
 ### GPU Offloading
+
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-ngl, --n-gpu-layers N` | Layers to offload to GPU (-1 = all) | 0 |
@@ -49,6 +52,7 @@ These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most oth
 **KV cache types:** `f32`, `f16`, `bf16`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`
 
 ### Sampling
+
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--temp N` | Temperature | 0.80 |
@@ -66,6 +70,7 @@ These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most oth
 | `--ignore-eos` | Ignore EOS token | off |
 
 ### RoPE / Context Extension
+
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--rope-scaling <type>` | RoPE scaling type | model default |
@@ -79,6 +84,7 @@ These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most oth
 | `--yarn-beta-fast N` | YaRN low correction dim | -1.00 |
 
 ### Chat & Interaction
+
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-cnv, --conversation` | Conversation mode (auto if chat template available) | auto |
@@ -95,6 +101,7 @@ These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most oth
 | `--simple-io` | Basic IO for subprocess compatibility | off |
 
 ### Logging & Debug
+
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-lv, --verbosity N` | Verbosity threshold | 3 |
@@ -140,6 +147,7 @@ These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most oth
 | `--chat-template-endpoint, --no-chat-template-endpoint` | Enable chat template endpoint | on |
 
 ### Endpoints (when running)
+
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/v1/chat/completions` | POST | OpenAI-compatible chat completions |

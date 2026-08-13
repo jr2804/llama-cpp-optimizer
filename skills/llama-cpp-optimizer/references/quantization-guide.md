@@ -22,6 +22,7 @@ Complete guide to GGUF quantization formats, model size estimation, and quantiza
 K-quants use mixed precision: attention weights stay at higher precision while feed-forward weights use lower precision.
 
 **Variants:**
+
 - `_S` (Small): Faster, lower quality
 - `_M` (Medium): Balanced (recommended)
 - `_L` (Large): Better quality, larger size

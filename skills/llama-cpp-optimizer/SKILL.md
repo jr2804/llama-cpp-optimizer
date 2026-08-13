@@ -190,3 +190,4 @@ curl -sL "https://huggingface.co/<user>/<model>/raw/main/<file.gguf>"
 - [system-capabilities.md](references/system-capabilities.md) — Detecting local system capabilities
 - [parameter-tuning.md](references/parameter-tuning.md) — Deriving optimal parameters from model + system
 - [moe-optimization.md](references/moe-optimization.md) — MoE-specific optimization guide
+- [caveats.md](references/caveats.md) — Fork-format GGUFs, load failures, sidecar confusion

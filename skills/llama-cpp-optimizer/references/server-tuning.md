@@ -2,6 +2,8 @@
 
 Production deployment patterns for `llama-server` with OpenAI-compatible API.
 
+> **Windows service:** see [windows-service.md](windows-service.md) to run `llama-server` as a Windows service via Servy (auto-start at boot).
+
 ## Basic Server
 
 ```bash
@@ -67,6 +69,7 @@ curl http://localhost:8080/metrics
 ```
 
 **Metrics exposed:**
+
 - `requests_total` — total requests received
 - `tokens_generated` — tokens produced
 - `prompt_tokens` — tokens in prompts
