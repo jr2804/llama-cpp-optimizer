@@ -6,7 +6,8 @@ skills-lock.json
 __pycache__/
 *.pyc
 
-# Model files
+# Binaries and model files
+bin/
 *.gguf
 models/
 
