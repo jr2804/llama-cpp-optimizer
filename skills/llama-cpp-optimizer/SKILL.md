@@ -19,6 +19,9 @@ Launch optimized llama.cpp models with faster inference and lower VRAM/RAM consu
 ## Quick Start
 
 ```bash
+# 0. (optional) install portable llama.cpp binaries into ./bin
+scripts/install-llama.sh latest vulkan        # or cpu / cuda-12.4; see references/portable-setup.md
+
 # 1. Detect system capabilities
 uv run scripts/detect-system.py
 
@@ -168,6 +171,7 @@ See [references/moe-optimization.md](references/moe-optimization.md) for MoE-spe
 - [system-capabilities.md](references/system-capabilities.md) — Detecting local system capabilities
 - [parameter-tuning.md](references/parameter-tuning.md) — Deriving optimal parameters from model + system
 - [moe-optimization.md](references/moe-optimization.md) — MoE-specific optimization guide
+- [portable-setup.md](references/portable-setup.md) — Install/update/switch backends via prebuilt binaries (no build)
 
 ## Model Download
 
