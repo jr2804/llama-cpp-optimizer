@@ -4,6 +4,42 @@ Production deployment patterns for `llama-server` with OpenAI-compatible API.
 
 > **Windows service:** see [windows-service.md](windows-service.md) to run `llama-server` as a Windows service via Servy (auto-start at boot).
 
+## Multiple Models: ONE instance, ONE port (router mode)
+
+`llama-server` has a built-in **router mode** that serves multiple models from a single process on a single port. **Never spawn one instance per model** — use `--models-preset` with an INI file instead:
+
+```bash
+llama-server --models-preset presets.ini --host 127.0.0.1 --port 8080
+```
+
+The INI file (`presets.ini`) defines each model as a section; any `llama-server` CLI flag is a valid key. A `[*]` section applies to all models:
+
+```ini
+[*]
+# Global defaults inherited by every model below
+ctx-size = 131072
+flash-attn = on
+
+[ornith-9b]
+model = models/Ornith-1.5-9B-Q4_K_M.gguf
+n-gpu-layers = 99
+
+[ornith-35b]
+model = models/Ornith-1.5-35B-A3B-Q4_K_M.gguf
+n-gpu-layers = 20
+cpu-moe = true
+ctx-size = 262144          # overrides the global 131072
+```
+
+Router-mode behavior:
+
+- Models load lazily on first request (`--models-autoload` is on by default) → fast service start.
+- `--models-max N` caps how many stay loaded simultaneously (default 4; LRU eviction).
+- Clients select the model per request: `"model": "ornith-9b"` in the OpenAI payload, or list via `GET /models`.
+- This replaces the `--hf-repo`/`--model` flags — in router mode the server loads no model at startup.
+
+> Do not confuse this file with Servy's service configuration. Servy is a Windows service wrapper; `presets.ini` is consumed by `llama-server` itself via `--models-preset`. Servy only forwards the argument (see [windows-service.md](windows-service.md)).
+
 ## Basic Server
 
 ```bash

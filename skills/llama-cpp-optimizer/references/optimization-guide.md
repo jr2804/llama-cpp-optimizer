@@ -37,9 +37,11 @@ llama-server -m model.gguf -c 32768          # --fit on is the default
 ```
 
 **Setting `-ngl` explicitly disables `--fit` for that run** — you'll see:
-```
+
+```text
 W common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 99, abort
 ```
+
 Only hardcode `-ngl` when you need a specific split (e.g. MoE experts in RAM via `--cpu-moe`).
 
 ### The VRAM budget: weights + KV cache + overhead
@@ -49,9 +51,11 @@ OOM at load is almost always the **KV cache**, not the weights. A 7 GiB model on
 ### Empirical: more GPU is almost always faster, even with unsupported ops
 
 Hybrid-attention models (e.g. Ternary-Bonsai 27B, ~75% linear/delta-net attention) emit warnings on some backends:
-```
+
+```text
 W resolve_fused_ops: fused Gated Delta Net (chunked) not supported, set to disabled
 ```
+
 It's tempting to force those layers to CPU where the kernel works. **Don't** — measured on RTX A2000 8GB (Vulkan), Ternary-Bonsai-27B Q2_0_g64:
 
 | offload | pp64 (t/s) | tg32 (t/s) |
@@ -134,6 +138,19 @@ llama-bench -m model.gguf -p 512 -n 128 -ctk f16 -ctk q4_0
 `pp` (prompt processing) is compute-bound and matters for long inputs. `tg` (token generation) is memory-bandwidth-bound and is what you feel in interactive chat — **optimize tg for chat, pp for batch/RAG**. Numbers are noisy (±10%); run with multiple `-r` repeats if you need stable comparisons.
 
 Each `-ngl` value triggers a full model reload (~30–60s for a 7 GB model), so bench a few targeted values, not a sweep.
+
+### Context window vs token speed: measure the trade-off
+
+A model that *loads* at 256K ctx does not necessarily *run well* at 256K ctx. Larger context = larger KV cache = more memory bandwidth pressure = lower tok/s. Use `llama-bench` to find the largest ctx where token speed stays acceptable:
+
+```bash
+# Compare tg (tokens/sec) across context sizes
+llama-bench -m model.gguf -p 1024 -n 128 -c 32768 -c 65536 -c 131072 -c 262144 -ngl 99 -r 3
+```
+
+- If `tg` drops below ~15 tok/s at a given ctx, the model is bandwidth-starved — consider reducing ctx or quantizing KV (`--cache-type-k q4_0`).
+- For interactive chat, target `tg` ≥ 20 tok/s. For batch/RAG, `pp` (prompt processing) matters more.
+- **Always report the measured tok/s alongside the chosen context size** — "131K at 45 tok/s" is actionable; "131K context" alone is not.
 
 ## Performance Benchmarks (Reference)
 

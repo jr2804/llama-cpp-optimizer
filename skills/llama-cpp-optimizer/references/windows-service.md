@@ -15,9 +15,49 @@ scoop install servy
 
 CLI docs: <https://github.com/aelassas/servy/wiki/Servy-CLI>
 
-## Create — via `mise x` (version-proof, recommended)
+## Choose your setup: mise-managed vs hard-coded path
 
-A hardcoded path to the versioned install dir (`b10361`) breaks silently on every mise update. Instead, point the service at `mise.exe` and let it resolve the current version:
+Both work. Pick based on how you install llama.cpp:
+
+| | mise-managed (`mise x`) | hard-coded exe path |
+|---|---|---|
+| Updates | auto (mise resolves latest) | manual (re-download, reinstall service) |
+| Servy setup | complex: `mise x` wrapper + 6 `--envVars` | simple: point at the exe directly |
+| Portable to new machines | yes (mise installs llama.cpp too) | no (copy binaries yourself) |
+| Breakage | version dir changes are invisible | path breaks if you move/rename |
+| Best for | multi-machine setups, auto-update | single machine, stable, minimal config |
+
+## Create — hard-coded exe path (simpler, recommended for single machines)
+
+Extract llama.cpp to a stable location (e.g. `C:\PortableApps\llama-cpp\`) and point Servy straight at the exe. No `mise x` wrapper, **no `--envVars` at all** — the LocalSystem profile problem disappears because there's no tool to find your user config.
+
+```powershell
+# Router mode (presets.ini) — recommended: models load lazily, fast service start
+servy-cli install -n llama-cpp `
+  -p "C:\PortableApps\llama-cpp\llama-server.exe" `
+  --displayName "llama.cpp Server" `
+  -d "Local llama.cpp inference server" `
+  --startupDir "C:\PortableApps\llama-cpp" `
+  "--params=--models-preset presets.ini --port 8001 --host 127.0.0.1 --log-disable" `
+  --startupType Automatic
+```
+
+> **`presets.ini` is a llama.cpp file, not a Servy file.** Servy is only the service wrapper — it does not parse `presets.ini` and has no model-routing concept of its own. The INI file is read by `llama-server` itself via the `--models-preset` flag (see [server-tuning.md](server-tuning.md) for the format). When asked to "generate a prefix-ini for these models", produce a llama.cpp `--models-preset` INI — one file, one instance, one port, one section per model.
+
+Update routine (after downloading a new release): copy the new `llama-server.exe` (and its `.dll`s) over the old ones, then `servy-cli restart -n llama-cpp`. No reinstall needed if you keep the same path.
+
+```powershell
+# Or: single model directly (no presets.ini)
+servy-cli install -n llama-cpp-granite `
+  -p "C:\PortableApps\llama-cpp\llama-server.exe" `
+  --startupDir "C:\PortableApps\llama-cpp" `
+  "--params=--model models/granite-4.1-3b-Q4_K_M.gguf --n-gpu-layers 99 --port 8001 --host 127.0.0.1 --log-disable" `
+  --startupType Automatic
+```
+
+## Create — via `mise x` (version-proof, recommended for mise users)
+
+A hardcoded path to the versioned install dir (`b10375`) breaks silently on every mise update. Instead, point the service at `mise.exe` and let it resolve the current version:
 
 ```powershell
 $mise = (Get-Command mise).Source   # resolves the WinGet symlink to mise.exe
@@ -40,7 +80,6 @@ The service runs as LocalSystem by default, which resolves `~` to `C:\Windows\Sy
 `mise x github:ggml-org/llama.cpp -- llama-server.exe ...` — without `.exe`, mise looks up a shim by that name and fails with `cannot find binary path` in a non-interactive env.
 
 ```powershell
-# Router mode (presets.ini) — recommended: models load lazily, fast service start
 servy-cli install -n llama-cpp `
   -p $mise `
   --displayName "llama.cpp Server" `
@@ -50,21 +89,6 @@ servy-cli install -n llama-cpp `
   "--envVars=MISE_DATA_DIR=C:\Users\<user>\AppData\Local\mise;MISE_CONFIG_DIR=C:\Users\<user>\.config\mise;MISE_CACHE_DIR=C:\Users\<user>\AppData\Local\Temp\mise;MISE_STATE_DIR=C:\Users\<user>\.local\state\mise;USERPROFILE=C:\Users\<user>;HOME=C:\Users\<user>" `
   --startupType Automatic
 ```
-
-## Create — direct exe path (simpler, breaks on update)
-
-Only if you accept re-installing the service after each mise update. Or for a single model directly (no presets.ini):
-
-```powershell
-# Single model directly (no presets.ini)
-servy-cli install -n llama-cpp-granite `
-  -p "C:\Users\jan.reimes\AppData\Local\mise\installs\github-ggml-org-llama-cpp\b10361\llama-server.exe" `
-  --startupDir "C:\PortableApps\llama-cpp" `
-  "--params=--model models/granite-4.1-3b-Q4_K_M.gguf --n-gpu-layers 99 --port 8001 --host 127.0.0.1 --log-disable" `
-  --startupType Automatic
-```
-
-The current CLI is `servy-cli.exe` (the `create` verb was renamed to `install` in newer versions).
 
 ## Control
 

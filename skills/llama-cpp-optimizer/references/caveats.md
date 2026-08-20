@@ -66,9 +66,11 @@ Presence of the arch string in the binary is necessary but **not sufficient** �
 Vulkan is the portable default (works on AMD/Intel/NVIDIA), but it lags CUDA on **fused kernels for new attention types**. Hybrid-attention models (linear/delta-net, gated-delta-net, mamba, etc.) ship fused CUDA/Metal kernels that Vulkan may not have yet.
 
 Symptom on Vulkan — a warning at load:
-```
+
+```text
 W resolve_fused_ops: fused Gated Delta Net (chunked) not supported, set to disabled
 ```
+
 The model still runs (unfused fallback), but **5–6× slower** at generation.
 
 Measured — Ternary-Bonsai-27B Q2_0_g64 on RTX A2000 8GB:

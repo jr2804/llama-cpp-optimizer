@@ -1,19 +1,34 @@
 ---
 name: llama-cpp-optimizer
-description: Launch optimized LLMs via llama.cpp with faster inference and lower VRAM consumption. Use when the user wants to run a local LLM via llama.cpp, tune inference parameters (context size, batch size, GPU layers, KV cache, MoE offload), determine the best model configuration for their hardware, or apply VRAM/RAM reduction hacks. Covers model selection, quantization, parameter derivation from model metadata + system capabilities, and execution via llama-cli/llama-server.
+description: >-
+  End-to-end llama.cpp setup and optimization. Portable installation (no admin),
+  multi-model server config (presets INI), hardware analysis, and parameter tuning
+  (quantization, KV cache, offload, context size) derived from model metadata +
+  system capabilities.
 ---
 
 # llama.cpp Optimizer
 
-Launch optimized llama.cpp models with faster inference and lower VRAM/RAM consumption, using parameters derived from model metadata and local system capabilities.
+Portable llama.cpp setup, multi-model serving, and parameter optimization.
+This skill covers the full lifecycle from "install" to "production server".
+
+## Scope
+
+1. **Portable installation** — get llama.cpp binaries into a project folder without admin rights or system packages. Methods: existing install, [mise](https://mise.jdx.dev), or the built-in [GitHub release downloader](references/portable-setup.md).
+2. **Windows service** — run `llama-server` as an auto-starting service via [Servy](references/windows-service.md).
+3. **Multi-model config** — draft a `--models-preset` INI file that serves multiple models from **one** `llama-server` instance on **one** port. See [server-tuning.md § Router mode](references/server-tuning.md#multiple-models-one-instance-one-port-router-mode).
+4. **Hardware analysis** — detect GPU (CUDA/Vulkan/ROCm), RAM, CPU cores, and disk via `scripts/detect-system.py`. See [system-capabilities.md](references/system-capabilities.md).
+5. **Parameter tuning** — derive optimal context size, GPU offload, KV cache quantization, and MoE strategy from model metadata + hardware. Use `llama-bench` to measure token speed trade-offs. See [parameter-tuning.md](references/parameter-tuning.md) and [optimization-guide.md](references/optimization-guide.md).
 
 ## When to Use
 
-- User wants to run a local LLM via llama.cpp
-- User needs help tuning inference parameters (context size, batch size, GPU layers, KV cache, etc.)
+- User wants to set up llama.cpp (portable, no admin, no compile)
+- User wants to run a local LLM via llama.cpp (interactive or server)
+- User wants to serve multiple models from one server instance
+- User wants to install llama.cpp as a Windows service
+- User needs help tuning inference parameters (context size, GPU layers, KV cache, MoE offload)
+- User wants the largest possible context window that still runs at usable speed
 - User wants to reduce VRAM/RAM usage or speed up inference
-- User wants to determine the best model configuration for their hardware
-- User asks about model selection, quantization levels, or MoE optimization
 - User provides a Hugging Face model URL and wants to run it locally
 
 ## Quick Start
@@ -34,6 +49,14 @@ uv run scripts/model-info.py Qwen/Qwen3.6-35B-A3B | uv run scripts/derive-params
 # 4. Run the model with derived parameters
 llama-cli --hf-repo <user>/<model> --hf-file <file.gguf> \
   $(uv run scripts/model-info.py <model> | uv run scripts/derive-params.py --model - --cli)
+```
+
+**Multi-model server** — one instance, one port, models load on demand:
+
+```bash
+# Draft presets.ini (see server-tuning.md for full format)
+llama-server --models-preset presets.ini --host 127.0.0.1 --port 8080
+# Hit /models to list, select via "model": "name" in requests
 ```
 
 ## Core Workflow
