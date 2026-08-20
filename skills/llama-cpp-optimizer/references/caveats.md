@@ -90,4 +90,17 @@ CUDA both unlocks the fused kernel AND has lower allocation overhead (fits full 
 # "github:ggml-org/llama.cpp" = {version = "latest", asset_pattern = "llama-*-vulkan-*"}        # portable
 ```
 
-CUDA builds ship as two zips on the GitHub release: `llama-*-bin-win-cuda-12.4-x64.zip` (the binaries) **plus** `cudart-llama-bin-win-cuda-12.4-x64.zip` (the ~370 MB CUDA runtime DLLs). Both must be extracted to the same directory.
+## 4. Windows CUDA requires the runtime DLLs
+
+On Windows, CUDA backend binaries do **not** ship with the CUDA runtime (`cublas*.dll`, `cudart*.dll`). These live in a separate `cudart-llama-*` asset published alongside every release. Both must be extracted to the same directory.
+
+If using `scripts/install-llama.py`, this is handled automatically. For manual installs:
+
+```bash
+# main binaries
+unzip llama-b10520-bin-win-cuda-12.4-x64.zip -d ./bin
+# CUDA runtime (separate asset)
+unzip cudart-llama-bin-win-cuda-12.4-x64.zip -d ./bin
+```
+
+On Linux, CUDA is statically linked — no extra download needed.

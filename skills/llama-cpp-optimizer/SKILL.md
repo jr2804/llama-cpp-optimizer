@@ -20,7 +20,7 @@ Launch optimized llama.cpp models with faster inference and lower VRAM/RAM consu
 
 ```bash
 # 0. (optional) install portable llama.cpp binaries into ./bin
-scripts/install-llama.sh latest vulkan        # or cpu / cuda-12.4; see references/portable-setup.md
+uv run scripts/install-llama.py latest vulkan  # or cpu / cuda-12.4; see references/portable-setup.md
 
 # 1. Detect system capabilities
 uv run scripts/detect-system.py
