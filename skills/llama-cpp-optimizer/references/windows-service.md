@@ -15,17 +15,26 @@ scoop install servy
 
 CLI docs: <https://github.com/aelassas/servy/wiki/Servy-CLI>
 
-## Choose your setup: mise-managed vs hard-coded path
+## Choose your setup: hard-coded path (recommended) vs mise-managed (discouraged)
 
-Both work. Pick based on how you install llama.cpp:
+**For a system-wide service, use a hard-coded exe path. Do not wrap the service in `mise x`.**
 
-| | mise-managed (`mise x`) | hard-coded exe path |
+The mise approach requires six environment variables just so LocalSystem can find
+mise's data/cache/state dirs, breaks on trust-store issues, and adds a fragile
+resolution layer between Servy and the binary. A stable portable folder with a
+direct exe path has none of these problems — and llama.cpp releases are
+infrequent enough that auto-update buys little.
+
+Use mise only in **local project directories** where you are *not* registering a service:
+mise pins the llama.cpp version per project via `mise.toml`, which is exactly what you want
+for dev work — and exactly what you don't want for an always-on service.
+
+| | hard-coded exe path | mise-managed (`mise x`) |
 |---|---|---|
-| Updates | auto (mise resolves latest) | manual (re-download, reinstall service) |
-| Servy setup | complex: `mise x` wrapper + 6 `--envVars` | simple: point at the exe directly |
-| Portable to new machines | yes (mise installs llama.cpp too) | no (copy binaries yourself) |
-| Breakage | version dir changes are invisible | path breaks if you move/rename |
-| Best for | multi-machine setups, auto-update | single machine, stable, minimal config |
+| Servy setup | simple: point at the exe directly, zero env vars | complex: `mise x` wrapper + 6 `--envVars` |
+| Reliability | high — nothing between Servy and the exe | fragile: trust store, profile dirs, shim lookup can all break silently |
+| Updates | manual (re-download, reinstall service) | auto (mise resolves latest) |
+| Best for | **system-wide services** | local project dirs only (no service) |
 
 ## Create — hard-coded exe path (simpler, recommended for single machines)
 
@@ -42,7 +51,13 @@ servy-cli install -n llama-cpp `
   --startupType Automatic
 ```
 
-> **`presets.ini` is a llama.cpp file, not a Servy file.** Servy is only the service wrapper — it does not parse `presets.ini` and has no model-routing concept of its own. The INI file is read by `llama-server` itself via the `--models-preset` flag (see [server-tuning.md](server-tuning.md) for the format). When asked to "generate a prefix-ini for these models", produce a llama.cpp `--models-preset` INI — one file, one instance, one port, one section per model.
+> **`presets.ini` is a llama.cpp file, not a Servy file.** Servy is only the
+> service wrapper — it does not parse `presets.ini` and has no model-routing
+> concept of its own. The INI file is read by `llama-server` itself via the
+> `--models-preset` flag (see [server-tuning.md](server-tuning.md) for the
+> format). When asked to "generate a prefix-ini for these models", produce a
+> llama.cpp `--models-preset` INI — one file, one instance, one port, one
+> section per model.
 
 Update routine (after downloading a new release): copy the new `llama-server.exe` (and its `.dll`s) over the old ones, then `servy-cli restart -n llama-cpp`. No reinstall needed if you keep the same path.
 
@@ -55,7 +70,12 @@ servy-cli install -n llama-cpp-granite `
   --startupType Automatic
 ```
 
-## Create — via `mise x` (version-proof, recommended for mise users)
+## Create — via `mise x` (discouraged — local project dirs only)
+
+> **Not recommended for system-wide services.** Prefer the direct exe path above. This
+> section is kept only for completeness / migrating existing setups. If your goal is a
+> per-project pinned llama.cpp without a service, use plain `mise x` in the project shell
+> instead of registering it with Servy.
 
 A hardcoded path to the versioned install dir (`b10375`) breaks silently on every mise update. Instead, point the service at `mise.exe` and let it resolve the current version:
 

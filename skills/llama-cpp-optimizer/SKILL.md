@@ -14,7 +14,7 @@ This skill covers the full lifecycle from "install" to "production server".
 
 ## Scope
 
-1. **Portable installation** — get llama.cpp binaries into a project folder without admin rights or system packages. Methods: existing install, [mise](https://mise.jdx.dev), or the built-in [GitHub release downloader](references/portable-setup.md).
+1. **Portable installation** — get llama.cpp binaries into a project folder without admin rights or system packages. Methods: existing install, [mise](https://mise.jdx.dev) (local project dirs only — never for system-wide services), or the built-in [GitHub release downloader](references/portable-setup.md) (preferred for services).
 2. **Windows service** — run `llama-server` as an auto-starting service via [Servy](references/windows-service.md).
 3. **Multi-model config** — draft a `--models-preset` INI file that serves multiple models from **one** `llama-server` instance on **one** port. See [server-tuning.md § Router mode](references/server-tuning.md#multiple-models-one-instance-one-port-router-mode).
 4. **Hardware analysis** — detect GPU (CUDA/Vulkan/ROCm), RAM, CPU cores, and disk via `scripts/detect-system.py`. See [system-capabilities.md](references/system-capabilities.md).
@@ -167,6 +167,8 @@ The derived parameters and run commands combine several techniques for faster in
 | ----------------------------- | ---------------------------------------------------------- |
 | `--flash-attn on`             | Faster attention, lower memory (esp. long contexts)        |
 | `--cache-type-k/v q8_0/q4_0`  | Quantize KV cache → lower VRAM, slight quality cost        |
+| `--no-op-offload`             | For hybrid-attention models at *partial* GPU offload: prevents fused kernel from being silently disabled (see [caveats.md](references/caveats.md#4-backend-choice-cuda-vs-vulkan-for-hybrid-attention-models)) |
+| `--cpu-moe`                   | MoE only: keep expert weights in system RAM, offload attention layers to GPU — fits large MoEs (12B+ active) on 8 GB VRAM (see [moe-optimization.md](references/moe-optimization.md)) |
 | `--cpu-moe` / `--n-cpu-moe N` | Keep MoE expert weights in CPU RAM → fit larger MoE models |
 | `--load-mode mmap`            | Memory-map model file → lower RAM footprint, faster load   |
 | `--n-gpu-layers N`            | Offload the right number of layers to GPU                  |

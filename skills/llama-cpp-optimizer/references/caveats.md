@@ -82,6 +82,13 @@ Measured — Ternary-Bonsai-27B Q2_0_g64 on RTX A2000 8GB:
 
 CUDA both unlocks the fused kernel AND has lower allocation overhead (fits full offload where Vulkan OOM'd at the same ctx). For an NVIDIA card, prefer the CUDA build for these model families. Vulkan stays the right call for portability/sharing across GPU vendors.
 
+**Partial offload trap**: with a CUDA build and `-ngl < total layers`, the default
+`--op-offload` can pin the fused op to the GPU while other layers run on CPU —
+the fused kernel is then **silently disabled** (same warning as above) and
+generation drops ~2–3× (measured: 0.5 → 1.2 tok/s). Fix: add `--no-op-offload`
+whenever a hybrid-attention model runs with partial GPU offload. Full offload
+(`-ngl 99`) is unaffected.
+
 ### Installing both via mise
 
 ```toml
@@ -106,3 +113,47 @@ unzip cudart-llama-bin-win-cuda-12.4-x64.zip -d ./bin
 ```
 
 On Linux, CUDA is statically linked — no extra download needed.
+
+## 5. VRAM hang: model load freezes indefinitely
+
+`llama-cli`/`llama-server` can **hang indefinitely** (no error, no output) when the
+model's required GPU workspace exceeds available VRAM — the process swaps and
+becomes unresponsive. This looks like a frozen terminal, not a failure.
+
+**Rule: always run initial model tests with a hard timeout and non-interactive flags:**
+
+```bash
+# Safe smoke test: 30s cap, no interactive REPL
+llama-cli -m model.gguf -ngl 99 -N 8 -n 32 --no-conversation < /dev/null
+```
+
+If it hangs or OOMs:
+
+1. Retry with `--cpu` to confirm the model itself is fine.
+2. Reduce `-ngl`, or for MoE models use `--cpu-moe` (see [moe-optimization.md](moe-optimization.md)).
+3. Only then raise context size stepwise.
+
+## 6. MTP draft models: two incompatible formats + silent non-engagement
+
+MTP (Multi-Token Prediction) sidecars come in formats that mainline llama.cpp
+cannot always use:
+
+| Draft format | Example | Loads on mainline? |
+|--------------|---------|--------------------|
+| Unsloth/vLLM-style MTP GGUF (`block_count = layers + 1`) | unsloth `mtp-Qwen3.8-27B-Q4_0.gguf` | ❌ `invalid vector subscript` crash |
+| Mainline-compatible draft GGUF (same layer count) | protoLabsAI Ornith MTP variants | ✅ via `--model-draft` |
+| Gemma4Assistant native MTP (`--spec-type draft-mtp`) | unsloth gemma-4-26B MTP sidecar | only builds with PR #24282; older builds load it but it **never engages** (0/0 accepted tokens) |
+
+Checklist when a drafter doesn't help:
+
+1. Read the draft GGUF metadata (`arch`, `block_count`) — an extra "nextn" block means vLLM/SGLang format → will not work on mainline.
+2. Verify engagement in logs: accepted-token counters must be > 0 after a few requests.
+3. On constrained VRAM, MTP can be **counterproductive**: draft weights + draft KV cache push VRAM past the throttling threshold and generation drops below the no-MTP baseline (measured: 54 → 10 tok/s on 8 GB). Benchmark with and without before keeping it.
+4. Check the model card's "Run with MTP" section for required build/features; if it cites a recent llama.cpp PR, verify your build includes it before promising MTP speedups.
+
+## 7. `-hf` auto-download may hang where the `hf` CLI works
+
+`llama-server -hf <repo>:<quant>` uses a built-in downloader that can hang on
+restricted networks even though Python's `hf` CLI downloads fine (different HTTP
+stack/proxy handling). Don't burn time debugging it — download with `hf download`
+or `curl` and point `--model` / presets.ini at the local file.
