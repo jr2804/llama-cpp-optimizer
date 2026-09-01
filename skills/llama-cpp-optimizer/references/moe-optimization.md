@@ -22,13 +22,16 @@ This means: **you can run a 35B MoE on a 6 GB GPU** by keeping inactive experts 
 ### `--cpu-moe` (keep ALL experts in CPU)
 
 ```bash
-llama-server --model model.gguf --n-gpu-layers 20 --cpu-moe
+llama-server --model model.gguf --n-gpu-layers 99 --cpu-moe
 ```
 
-- All 256 expert weight matrices stay in CPU RAM
-- Only dense layers + active expert weights are loaded to GPU
+- All expert weight matrices stay in CPU RAM
+- Attention/shared/dense layers go to GPU (use `-ngl 99` together with `--cpu-moe`)
 - VRAM usage: dense params (~2-3 GB) + KV cache + overhead
 - **Best for:** VRAM < 8 GB
+- Measured (Gemma-4-26B-A4B, 128 experts, RTX 2070 8GB): `-ngl 99 --cpu-moe` =
+  **10.0 tok/s** vs 8.7 tok/s CPU-only (+15%) — always try this before falling
+  back to pure CPU
 
 ### `--n-cpu-moe N` (keep N layers' experts in CPU)
 

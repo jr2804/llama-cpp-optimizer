@@ -1,6 +1,6 @@
 [tools]
 # llama-cpp as portable installation
-"github:ggml-org/llama.cpp" = {version = "latest", asset_pattern = "llama-*-vulkan-*.*"}
+#"github:ggml-org/llama.cpp" = {version = "latest", asset_pattern = "llama-*-vulkan-*.*"}
 
 # other tools
 bun = "latest"

@@ -19,6 +19,8 @@ The INI file (`presets.ini`) defines each model as a section; any `llama-server`
 # Global defaults inherited by every model below
 ctx-size = 131072
 flash-attn = on
+cache-type-k = q4_0      # almost lossless; halves KV cache VRAM
+cache-type-v = q4_0      # ditto — set once here, not per-model
 
 [ornith-9b]
 # Dense 9B: leave n-gpu-layers unset so --fit (global default) tunes offload
@@ -31,6 +33,24 @@ n-gpu-layers = 20
 cpu-moe = true
 ctx-size = 262144          # overrides the global 131072
 ```
+
+### VRAM sharing in router mode
+
+Models load lazily (first request loads the first model's weights into VRAM), but
+**once loaded, weights stay resident** — the server does not swap models out.
+Queried two models with `-ngl 99` each and total weights > GPU VRAM → the second
+model's load succeeds but performance collapses (memory thrashing).
+
+**Rule of thumb**: the sum of all models' working-set sizes (weights + KV cache at
+their configured context) must fit in VRAM if you plan to switch between them in
+the same session. For single-model-per-session use, this is fine — each session
+only loads the model it needs.
+
+To control VRAM sharing:
+
+- Set `--models-max 1` (only one model stays loaded; least-recently-used is evicted)
+- Run separate `llama-server` instances on different ports for models that must
+  always be GPU-ready simultaneously (see [windows-service.md](windows-service.md)).
 
 Router-mode behavior:
 

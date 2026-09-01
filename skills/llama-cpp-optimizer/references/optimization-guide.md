@@ -29,7 +29,10 @@ Offload transformer layers to GPU for maximum throughput.
 
 ### Let `--fit` do it (default, recommended)
 
-`llama-server` and `llama-cli` ship with `--fit on` **enabled by default**. It auto-tunes `n-gpu-layers` (and can shrink `--ctx-size` down to `--fit-ctx`, default 4096) to fit device memory, leaving a safety margin (`--fit-target`, default 1024 MiB).
+`llama-server` and `llama-cli` ship with `--fit on` **enabled by default**.
+It auto-tunes `n-gpu-layers` (and can shrink `--ctx-size` down to `--fit-ctx`,
+default 4096) to fit device memory, leaving a safety margin
+(`--fit-target`, default 1024 MiB).
 
 ```bash
 # Just set ctx and let fit pick the offload — works for any model/card combo
@@ -64,7 +67,11 @@ It's tempting to force those layers to CPU where the kernel works. **Don't** —
 | ngl=50 | 78 | 3.5 |
 | `--fit` (auto) | 57 | **4.6** |
 
-The unfused GPU fallback path still beats CPU by 2–3× on token generation, 10× on prompt processing. The one wrinkle: **maxing out offload can slow generation** if it leaves no VRAM headroom for activation buffers — `--fit`'s conservative split won on tg (4.6 vs 3.5) even though it offloaded fewer layers. When in doubt, bench both.
+The unfused GPU fallback path still beats CPU by 2–3× on token generation,
+10× on prompt processing. The one wrinkle: **maxing out offload can slow
+generation** if it leaves no VRAM headroom for activation buffers — `--fit`'s
+conservative split won on tg (4.6 vs 3.5) even though it offloaded fewer
+layers. When in doubt, bench both.
 
 ### Manual tuning (when `--fit` is wrong)
 
