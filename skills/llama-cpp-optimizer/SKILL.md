@@ -19,6 +19,7 @@ This skill covers the full lifecycle from "install" to "production server".
 3. **Multi-model config** — draft a `--models-preset` INI file that serves multiple models from **one** `llama-server` instance on **one** port. See [server-tuning.md § Router mode](references/server-tuning.md#multiple-models-one-instance-one-port-router-mode).
 4. **Hardware analysis** — detect GPU (CUDA/Vulkan/ROCm), RAM, CPU cores, and disk via `scripts/detect-system.py`. See [system-capabilities.md](references/system-capabilities.md).
 5. **Parameter tuning** — derive optimal context size, GPU offload, KV cache quantization, and MoE strategy from model metadata + hardware. Use `llama-bench` to measure token speed trade-offs. See [parameter-tuning.md](references/parameter-tuning.md) and [optimization-guide.md](references/optimization-guide.md).
+6. **Benchmarking** — measure real chat tok/s (cold + warm) for a preset via `scripts/bench-model.py`. See [benchmarking.md](references/benchmarking.md).
 
 ## When to Use
 
@@ -156,6 +157,7 @@ The `scripts/` directory contains three Python scripts that automate the paramet
 | `detect-system.py` | Detect system capabilities (GPU, RAM, CPU) | `uv run scripts/detect-system.py`           |
 | `model-info.py`    | Fetch model metadata from Hugging Face     | `uv run scripts/model-info.py <model_id>`   |
 | `derive-params.py` | Derive optimal llama.cpp parameters        | `uv run scripts/derive-params.py --model -` |
+| `bench-model.py`  | Bench a preset: cold + warm tok/s         | `uv run scripts/bench-model.py --preset NAME` |
 
 All scripts use inline dependencies (`# /// script` header) and run via `uv run` — no manual dependency management needed.
 
@@ -195,6 +197,7 @@ See [references/moe-optimization.md](references/moe-optimization.md) for MoE-spe
 - [parameter-tuning.md](references/parameter-tuning.md) — Deriving optimal parameters from model + system
 - [moe-optimization.md](references/moe-optimization.md) — MoE-specific optimization guide
 - [portable-setup.md](references/portable-setup.md) — Install/update/switch backends via prebuilt binaries (no build)
+- [benchmarking.md](references/benchmarking.md) — Measure real chat tok/s (cold + warm) for a preset
 
 ## Model Download
 

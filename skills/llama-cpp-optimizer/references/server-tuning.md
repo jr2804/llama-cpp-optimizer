@@ -21,8 +21,9 @@ ctx-size = 131072
 flash-attn = on
 
 [ornith-9b]
+# Dense 9B: leave n-gpu-layers unset so --fit (global default) tunes offload
+# for the requested ctx. Hardcoding -ngl is reserved for MoE cpu-moe splits.
 model = models/Ornith-1.5-9B-Q4_K_M.gguf
-n-gpu-layers = 99
 
 [ornith-35b]
 model = models/Ornith-1.5-35B-A3B-Q4_K_M.gguf
