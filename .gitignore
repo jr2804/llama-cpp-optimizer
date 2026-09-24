@@ -8,6 +8,7 @@ __pycache__/
 
 # Binaries and model files
 bin/
+bin-*/
 *.gguf
 models/
 
