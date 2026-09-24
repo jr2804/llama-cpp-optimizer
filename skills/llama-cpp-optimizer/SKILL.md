@@ -14,7 +14,7 @@ This skill covers the full lifecycle from "install" to "production server".
 
 ## Scope
 
-1. **Portable installation** — get llama.cpp binaries into a project folder without admin rights or system packages. Methods: existing install, [mise](https://mise.jdx.dev) (local project dirs only — never for system-wide services), or the built-in [GitHub release downloader](references/portable-setup.md) (preferred for services).
+1. **Portable installation** — get llama.cpp binaries into a project folder without admin rights or system packages. Methods: existing install, [mise](https://mise.jdx.dev) (local project dirs only — never for system-wide services), or the built-in [GitHub release downloader](references/portable-setup.md) (preferred for services). Also installs **fork builds** for specialized quantizations/tensor types, each in its own folder via `--repo`.
 2. **Windows service** — run `llama-server` as an auto-starting service via [Servy](references/windows-service.md).
 3. **Multi-model config** — draft a `--models-preset` INI file that serves multiple models from **one** `llama-server` instance on **one** port. See [server-tuning.md § Router mode](references/server-tuning.md#multiple-models-one-instance-one-port-router-mode).
 4. **Hardware analysis** — detect GPU (CUDA/Vulkan/ROCm), RAM, CPU cores, and disk via `scripts/detect-system.py`. See [system-capabilities.md](references/system-capabilities.md).
@@ -24,6 +24,7 @@ This skill covers the full lifecycle from "install" to "production server".
 ## When to Use
 
 - User wants to set up llama.cpp (portable, no admin, no compile)
+- User wants to run a model whose quantization needs a llama.cpp **fork** (ternary, custom tensor types)
 - User wants to run a local LLM via llama.cpp (interactive or server)
 - User wants to serve multiple models from one server instance
 - User wants to install llama.cpp as a Windows service

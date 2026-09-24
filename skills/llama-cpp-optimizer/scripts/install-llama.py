@@ -2,19 +2,34 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Portable llama.cpp installer: download prebuilt binaries into ./bin (override: LLAMA_BIN env).
+"""Portable llama.cpp installer: download prebuilt binaries into ./bin.
 
 No system install, no build. Switch backend by re-running with a different one.
+Works for upstream ggml-org/llama.cpp and for forks that ship specialized
+quantizations/tensor types (e.g. PrismML-Eng/llama.cpp for ternary Q2_0).
 
 Usage:
-    uv run scripts/install-llama.py [VERSION] [BACKEND]
+    uv run scripts/install-llama.py [VERSION] [BACKEND] [--repo OWNER/REPO] [--bin DIR]
       VERSION  release tag, default: latest  (e.g. b10520)
       BACKEND  cpu cuda-12.4 cuda-13.3 vulkan rocm-7.14 openvino-2026.3 sycl
                Omit BACKEND to print available backends for VERSION.
+      --repo   GitHub repo to install from (default: ggml-org/llama.cpp).
+               Env: LLAMA_REPO
+      --bin    destination folder. Env: LLAMA_BIN.
+               Default: ./bin for upstream; ./bin-<owner> for any fork, so a
+               fork install never overwrites the upstream build.
+
+Examples:
+    # upstream, Vulkan
+    uv run scripts/install-llama.py latest vulkan
+
+    # Prism fork (ternary quants), own folder
+    uv run scripts/install-llama.py --repo PrismML-Eng/llama.cpp latest vulkan
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import platform
@@ -27,8 +42,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-REPO = "ggml-org/llama.cpp"
-REPO_URL = f"https://api.github.com/repos/{REPO}"
+DEFAULT_REPO = "ggml-org/llama.cpp"
+REPO = DEFAULT_REPO  # set from --repo/LLAMA_REPO in main(); read by API helpers
 
 
 # ---------------------------------------------------------------------------
@@ -36,33 +51,78 @@ REPO_URL = f"https://api.github.com/repos/{REPO}"
 # ---------------------------------------------------------------------------
 
 
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        prog="install-llama.py",
+        description="Download prebuilt llama.cpp binaries into a portable folder.",
+    )
+    p.add_argument(
+        "version", nargs="?", default="latest", help="release tag (default: latest)"
+    )
+    p.add_argument(
+        "backend", nargs="?", help="cpu, cuda-12.4, vulkan, ... (omit to list available)"
+    )
+    p.add_argument(
+        "--repo",
+        default=os.environ.get("LLAMA_REPO", DEFAULT_REPO),
+        help=f"GitHub repo OWNER/REPO (default: {DEFAULT_REPO})",
+    )
+    p.add_argument(
+        "--bin",
+        dest="bin_dir",
+        default=None,
+        help="destination folder (default: ./bin, or ./bin-<owner> for forks)",
+    )
+    return p.parse_args()
+
+
+def _default_bin_dir(repo: str) -> Path:
+    """`./bin` for upstream; `./bin-<owner>` for a fork, so builds never collide."""
+    if repo == DEFAULT_REPO:
+        return Path.cwd() / "bin"
+    return Path.cwd() / f"bin-{repo.split('/', 1)[0].lower()}"
+
+
 def main() -> None:
+    global REPO
+
+    args = _parse_args()
+    REPO = args.repo
+
     os_tag = _os_tag()
     arch_tag = _arch_tag()
-    default_backend = "cpu"
+    backend = args.backend or "cpu"
+    dest = Path(
+        args.bin_dir or os.environ.get("LLAMA_BIN") or str(_default_bin_dir(REPO))
+    )
 
-    version = sys.argv[1] if len(sys.argv) > 1 else "latest"
-    backend = sys.argv[2] if len(sys.argv) > 2 else default_backend
-
-    dest = Path(os.environ.get("LLAMA_BIN", str(Path.cwd() / "bin")))
-
-    if version == "latest":
-        version = _latest_tag()
-
-    # No backend arg → list and exit.
-    if len(sys.argv) <= 2:
-        backends = _list_backends(version, os_tag, arch_tag)
-        print(f"Available backends for {version} ({os_tag} {arch_tag}):")
+    # No backend arg → list and exit (no destination needed).
+    if args.backend is None:
+        tag = args.version
+        if tag == "latest":
+            tag = _latest_tag_with_binaries(os_tag, arch_tag)
+        backends = _list_backends(tag, os_tag, arch_tag)
+        print(f"Available backends for {REPO} {tag} ({os_tag} {arch_tag}):")
         for b in backends:
             print(f"  {b}")
         return
 
-    backend_label, url = _pick_asset(version, os_tag, backend, arch_tag)
+    # Never install into the skill itself: builds are ~100 MB each and belong in
+    # the user's project. Catches `cd <skill-dir> && uv run scripts/...`.
+    skill_dir = Path(__file__).resolve().parent.parent
+    dest = dest.resolve()
+    if dest == skill_dir or skill_dir in dest.parents:
+        sys.exit(
+            f"Refusing to install into the skill directory ({skill_dir}).\n"
+            "Run this from your own project, or pass --bin <your-project>/bin"
+        )
+
+    version, url = _resolve(args.version, os_tag, backend, arch_tag)
     ext = "zip" if os_tag == "win" else "tar.gz"
 
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp) / f"pkg.{ext}"
-        print(f"Downloading llama.cpp {version} ({backend_label}) ...")
+        print(f"Downloading {REPO} {version} ({backend}) -> {dest}")
         _download(url, archive)
 
         # Wipe dest and re-extract.
@@ -76,7 +136,7 @@ def main() -> None:
         cudart_url = _cuda_runtime_url(version, backend, arch_tag)
         if cudart_url:
             cudart_archive = Path(tmp) / "cudart.zip"
-            print(f"Downloading CUDA runtime for {backend_label} ...")
+            print(f"Downloading CUDA runtime for {backend} ...")
             _download(cudart_url, cudart_archive)
             _extract(cudart_archive, dest)
             _flatten(dest)
@@ -92,10 +152,10 @@ def main() -> None:
             if r.returncode == 0
             else "(version unknown)"
         )
-        print(f"Installed llama.cpp {version} ({backend_label}) -> {dest}")
+        print(f"Installed llama.cpp {version} ({backend}) -> {dest}")
         print(f"  {version_line}")
     else:
-        print(f"Installed llama.cpp {version} ({backend_label}) -> {dest}")
+        print(f"Installed llama.cpp {version} ({backend}) -> {dest}")
 
 
 # ---------------------------------------------------------------------------
@@ -135,23 +195,68 @@ def _download(url: str, dest: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _latest_tag() -> str:
-    info = _api_get(f"/repos/{REPO}/releases/latest")
-    return info["tag_name"]
+def _fetch_releases(limit: int = 30) -> list[dict]:
+    """Newest releases first, prereleases included — that is where the binaries live."""
+    return _api_get(f"/repos/{REPO}/releases?per_page={limit}")
 
 
-def _pick_asset(tag: str, os_tag: str, backend: str, arch: str) -> tuple[str, str]:
-    """Return (backend_label, download_url) or exit with error."""
-    assets = _release_assets(tag)
-    names = {a["name"]: a["browser_download_url"] for a in assets}
-    for name in _candidate_names(tag, os_tag, backend, arch):
-        if name in names:
-            return backend, names[name]
+def _is_build_asset(name: str) -> bool:
+    """A real binary build, not a companion runtime or an SDK bundle.
 
-    # No match — show what IS available for this OS + arch so user can pick.
-    available = sorted(n for n in names if f"bin-{os_tag}-" in n and arch in n)
+    `cudart-*` archives carry only runtime DLLs and would otherwise match the
+    same `bin-<os>-<backend>-<arch>` suffix as the build itself.
+    """
+    return "bin-" in name and not name.startswith("cudart-")
+
+
+def _match_asset(
+    assets: list[dict], os_tag: str, backend: str, arch: str
+) -> tuple[str, str] | None:
+    """Return (asset_name, download_url) for the first matching suffix, else None."""
+    by_name = {
+        a["name"]: a["browser_download_url"]
+        for a in assets
+        if _is_build_asset(a["name"])
+    }
+    for suffix in _asset_suffixes(os_tag, backend, arch):
+        name = next((n for n in by_name if n.endswith(suffix)), None)
+        if name:
+            return name, by_name[name]
+    return None
+
+
+def _latest_tag_with_binaries(os_tag: str, arch: str) -> str:
+    """Newest release that actually ships a build for this OS/arch.
+
+    Upstream tags stable milestones (e.g. v0.5.0) that carry no assets; the
+    builds live in prerelease `bXXXXX` tags. A release can also be partially
+    uploaded, so scan until one has a build for this platform.
+    """
+    for rel in _fetch_releases():
+        for a in rel.get("assets", []):
+            name = a["name"]
+            if (
+                _is_build_asset(name)
+                and _asset_matches_os(name, os_tag)
+                and f"-{arch}" in name
+            ):
+                return rel["tag_name"]
+    sys.exit(f"No release in {REPO} ships builds for {os_tag} {arch}.")
+
+
+def _fail_no_asset(
+    version: str, os_tag: str, backend: str, arch: str, assets: list[dict]
+) -> None:
+    """Print the assets that DO exist for this OS/arch, then exit."""
+    available = sorted(
+        a["name"]
+        for a in assets
+        if _is_build_asset(a["name"])
+        and _asset_matches_os(a["name"], os_tag)
+        and arch in a["name"]
+    )
     print(
-        f"Backend '{backend}' not available for {tag} ({os_tag} {arch}).\n",
+        f"Backend '{backend}' not available for {REPO} {version} ({os_tag} {arch}).\n",
         file=sys.stderr,
     )
     if available:
@@ -161,32 +266,72 @@ def _pick_asset(tag: str, os_tag: str, backend: str, arch: str) -> tuple[str, st
     sys.exit(1)
 
 
-def _candidate_names(tag: str, os_tag: str, backend: str, arch: str) -> list[str]:
-    """Return plausible asset filenames for this OS/backend/arch, best guess first."""
+def _resolve(version: str, os_tag: str, backend: str, arch: str) -> tuple[str, str]:
+    """Resolve (tag, download_url) for the requested build.
+
+    `latest` scans newest releases for one that carries the wanted asset, which
+    also handles the fork case where the stable tag differs from the binary tag.
+    """
+    if version != "latest":
+        assets = _release_assets(version)
+        hit = _match_asset(assets, os_tag, backend, arch)
+        if hit:
+            return version, hit[1]
+        _fail_no_asset(version, os_tag, backend, arch, assets)
+
+    for rel in _fetch_releases():
+        hit = _match_asset(rel.get("assets", []), os_tag, backend, arch)
+        if hit:
+            return rel["tag_name"], hit[1]
+    sys.exit(f"No release in {REPO} publishes a '{backend}' build for {os_tag} {arch}.")
+
+
+def _os_tokens(os_tag: str) -> tuple[str, ...]:
+    """OS tokens used in asset names. Linux appears as both `ubuntu` and `linux`."""
+    if os_tag == "ubuntu":
+        return ("ubuntu", "linux")
+    return (os_tag,)
+
+
+def _asset_matches_os(name: str, os_tag: str) -> bool:
+    return any(f"bin-{t}-" in name for t in _os_tokens(os_tag))
+
+
+def _asset_suffixes(os_tag: str, backend: str, arch: str) -> list[str]:
+    """Asset filename suffixes to try, best guess first.
+
+    Matched with str.endswith, so a fork's version prefix (e.g. `prism-b10735-`)
+    is irrelevant. Linux builds are published under both `ubuntu-` and `linux-`.
+    """
     if os_tag == "macos":
-        # macos: cpu-only build, no backend token
-        return [f"llama-{tag}-bin-macos-{arch}.tar.gz"]
-    if os_tag == "ubuntu" and backend == "cpu":
-        return [f"llama-{tag}-bin-ubuntu-{arch}.tar.gz"]
-    # win or linux+gpu: backend is always part of the name
-    ext = "zip" if os_tag == "win" else "tar.gz"
-    return [f"llama-{tag}-bin-{os_tag}-{backend}-{arch}.{ext}"]
+        return [f"bin-macos-{arch}.tar.gz"]
+    if os_tag == "win":
+        return [f"bin-win-{backend}-{arch}.zip"]
+    if backend == "cpu":
+        return [f"bin-ubuntu-{arch}.tar.gz", f"bin-linux-cpu-{arch}.tar.gz"]
+    return [
+        f"bin-ubuntu-{backend}-{arch}.tar.gz",
+        f"bin-linux-{backend}-{arch}.tar.gz",
+    ]
 
 
 def _list_backends(tag: str, os_tag: str, arch: str) -> list[str]:
     """Derive human-friendly backend labels from published asset names."""
-    assets = _release_assets(tag)
-    backends: dict[str, bool] = {}
-    for a in assets:
+    backends = set()
+    for a in _release_assets(tag):
         name = a["name"]
-        if f"bin-{os_tag}-" not in name or arch not in name:
+        if (
+            not _is_build_asset(name)
+            or not _asset_matches_os(name, os_tag)
+            or f"-{arch}." not in name
+        ):
             continue
-        # strip  llama-<tag>-bin-<os>-  and  -<arch>.<ext>
-        suffix = name.split(f"bin-{os_tag}-", 1)[-1]
-        suffix = suffix.rsplit(f"-{arch}.", 1)[0]
-        label = suffix if suffix else "cpu"  # bare = cpu
-        if label not in backends:
-            backends[label] = True
+        stem = name.rsplit(f"-{arch}.", 1)[0]  # drop -<arch>.<ext>
+        for token in _os_tokens(os_tag):
+            marker = f"bin-{token}-"
+            if marker in stem:
+                backends.add(stem.split(marker, 1)[1] or "cpu")  # bare = cpu
+                break
     return sorted(backends)
 
 

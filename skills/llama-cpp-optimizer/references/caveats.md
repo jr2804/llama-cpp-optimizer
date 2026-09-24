@@ -21,6 +21,9 @@ Example — Ternary-Bonsai (ternary Q2_0), from the [upstream status table](http
 | `*-Q2_0_g64.gguf` | Group size 64 (official llama.cpp format) | Mainline (CPU, Metal, Vulkan, CUDA) |
 | `*-PQ2_0.gguf` | Experimental migration format | Do not use yet |
 
+To run the fork variant next to upstream, install it into its own folder — see
+[portable-setup.md § Forks and specialized builds](portable-setup.md#forks-and-specialized-builds).
+
 Checklist before diagnosing a load failure:
 
 1. **Verify the download** — compare SHA256 against the repo's LFS pointer:

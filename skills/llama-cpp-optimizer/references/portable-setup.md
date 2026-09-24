@@ -1,86 +1,151 @@
 # Portable Setup (prebuilt binaries)
 
 Run llama.cpp without compiling or a system install: download official prebuilt
-binaries into a project folder (`./bin` by default) and switch backends (cpu /
-cuda / vulkan / …) by re-downloading. All binaries live next to your project, so
-versions and backends are trivially swappable; nothing touches PATH or Program Files.
+binaries into a project folder and switch backend (cpu / cuda / vulkan / …) by
+re-downloading. Nothing touches PATH, Program Files, or the registry.
 
-## Install / Update
+Works for **upstream** `ggml-org/llama.cpp` and for **forks** that ship specialized
+quantizations or tensor types — see [Forks and specialized builds](#forks-and-specialized-builds).
 
-```bash
-# print available backends for the latest release (no download)
-uv run scripts/install-llama.py
+## Where the binaries go
 
-# install latest, cpu backend -> ./bin
-uv run scripts/install-llama.py latest cpu
+| Build | Default folder |
+|-------|----------------|
+| upstream `ggml-org/llama.cpp` | `./bin` |
+| a fork, e.g. `PrismML-Eng/llama.cpp` | `./bin-<owner>` → `./bin-prismml-eng` |
 
-# install a specific backend + pinned version
-uv run scripts/install-llama.py b10520 cuda-12.4
+**One folder per build variant. Never mix variants in one folder** — fork builds
+carry different tensor/quant support and their DLLs overwrite each other's. Each
+folder is a complete, self-contained, swappable install; switching variants means
+pointing the runner at another folder. Re-running an install *rewrites* its target
+folder, so old files never linger next to new ones.
 
-# install into a custom folder
-LLAMA_BIN=./tools/bin uv run scripts/install-llama.py latest vulkan
+Override the location with `--bin DIR` or `LLAMA_BIN`. The installer **refuses to
+write inside the skill directory** — builds are ~100 MB each and belong to your
+project. Add them to `.gitignore`:
+
+```gitignore
+bin/
+bin-*/
 ```
 
-`uv run scripts/install-llama.py [VERSION] [BACKEND]`:
+## Install / update
 
-| Arg       | Meaning                                             |
-|-----------|-----------------------------------------------------|
-| `VERSION` | release tag, default `latest` (e.g. `b10520`)       |
-| `BACKEND` | `cpu` (default), `cuda-12.4`, `cuda-13.3`, `vulkan`, `rocm-7.14`, `openvino-2026.3`, `sycl` |
+Run from **your project directory** so the binaries land in your project, not in
+the skill:
 
-Backends query the GitHub release asset list, so the exact names follow what
-`ggml-org/llama.cpp` actually publishes. Run with no `BACKEND` to see the current
-list. It resolves `latest` via the GitHub API, downloads the matching
-`llama-<ver>-bin-<os>-<backend>-<arch>.zip`/`.tar.gz`, extracts into `./bin`, and
-flattens the versioned subfolder llama zips produce.
+```bash
+# <skill> is this skill's folder
+S=<skill>/scripts/install-llama.py
+
+# upstream, Vulkan, into ./bin
+uv run "$S" --bin ./bin latest vulkan
+
+# pinned version
+uv run "$S" --bin ./bin b11165 vulkan
+
+# a fork — installs into ./bin-prismml-eng automatically
+uv run "$S" --repo PrismML-Eng/llama.cpp latest vulkan
+
+# list available backends for your platform (no download, no destination needed)
+uv run "$S"
+uv run "$S" --repo PrismML-Eng/llama.cpp
+```
+
+| Arg / flag | Meaning |
+|------------|---------|
+| `VERSION` | release tag, default `latest` (e.g. `b11165`) |
+| `BACKEND` | `cpu` (default), `cuda-12.4`, `cuda-13.4`, `vulkan`, `rocm-10.0`, `openvino-2026.4`, `sycl` |
+| `--repo` | GitHub `OWNER/REPO` to install from (env `LLAMA_REPO`) |
+| `--bin` | destination folder (env `LLAMA_BIN`) |
+
+Run with no `BACKEND` to print what the repo actually publishes for your OS/arch.
+
+### Why `latest` scans releases
+
+`latest` picks the newest release that **really publishes a build for your
+platform**, rather than trusting `releases/latest`. Two real traps this avoids:
+
+- Upstream tags stable milestones (e.g. `v0.5.0`) that carry **no** binaries; the
+  builds live in prerelease `bXXXXX` tags.
+- Release assets upload incrementally, so the newest tag can briefly lack your
+  OS/backend while an older one has it.
+
+Forks differ here too: `PrismML-Eng/llama.cpp` marks its binary release as the
+stable one, while upstream never does.
 
 ## Windows CUDA: runtime DLLs
 
 On Windows, CUDA backend binaries do **not** ship with the CUDA runtime
-(`cublas*.dll`, `cudart*.dll`). These live in a separate `cudart-llama-*` asset
-published alongside every release. The installer handles this automatically:
-when a CUDA backend is selected on Windows, it downloads and extracts the
-matching runtime asset into the same `./bin` folder.
+(`cublas*.dll`, `cudart*.dll`). These live in a separate `cudart-*` asset published
+alongside each release, and the installer downloads it automatically into the same
+folder.
 
-On Linux, CUDA is statically linked — no extra download needed.
+On Linux, CUDA is statically linked — no extra download. Note that upstream
+publishes no generic Linux CUDA build at all (only Vulkan/openvino/sycl); some
+forks do.
 
-If you install manually (without the script), grab both:
-
-```bash
-# main binaries
-curl -L -o llama.zip "https://huggingface.co/ggml-org/llama.cpp/releases/download/b10520/llama-b10520-bin-win-cuda-12.4-x64.zip"
-# CUDA runtime (Windows only)
-curl -L -o cudart.zip "https://huggingface.co/ggml-org/llama.cpp/releases/download/b10520/cudart-llama-bin-win-cuda-12.4-x64.zip"
-# extract both into the same folder
-```
-
-## Switching backend / bumping version
-
-Re-running the script rewrites `./bin` (old files removed first), so switching is
-just another invocation:
+For a manual install, extract both archives into the *same* folder:
 
 ```bash
-# cpu -> vulkan
-uv run scripts/install-llama.py b10520 vulkan
-# vulkan -> newest cuda
-uv run scripts/install-llama.py latest cuda-12.4
+unzip llama-b11165-bin-win-cuda-12.4-x64.zip -d ./bin
+unzip cudart-llama-bin-win-cuda-12.4-x64.zip -d ./bin
 ```
 
-`./bin` holds every llama tool (`llama-cli`, `llama-server`, `llama-bench`, …)
-plus the runtime DLLs, so point any runner at that folder. To serve differently
-configured instances, keep separate folders and pass `LLAMA_BIN`.
+## Switching backend / version
+
+Just run the installer again — it rewrites the target folder:
+
+```bash
+uv run "$S" --bin ./bin b11165 vulkan       # cpu -> vulkan
+uv run "$S" --bin ./bin latest cuda-12.4    # vulkan -> newest cuda
+```
+
+`./bin` then holds every llama tool (`llama-cli`, `llama-server`, `llama-bench`, …)
+plus its runtime DLLs. To run several differently-configured instances, keep
+separate folders and select with `LLAMA_BIN`.
+
+## Forks and specialized builds
+
+Some models need a llama.cpp **fork**: the quantization or tensor type is not in
+upstream (yet). Examples:
+
+| Model | Quant | Build needed |
+|-------|-------|--------------|
+| [Ternary-Bonsai](https://huggingface.co/prism-ml/Ternary-Bonsai-27B-gguf) `*-Q2_0.gguf` | ternary, group size 128 (fork packing) | **Prism fork** — `--repo PrismML-Eng/llama.cpp` |
+| Ternary-Bonsai `*-Q2_0_g64.gguf` | ternary, group size 64 (official packing) | upstream |
+| [Spark-X2.5](https://huggingface.co/XHToken/Spark-X2.5-4B-GGUF) | `spark2_5` arch | upstream (merged — no fork needed) |
+
+Install a fork side by side with upstream, then run whichever binary matches the model:
+
+```bash
+uv run "$S" --repo PrismML-Eng/llama.cpp --bin ./bin-prism latest vulkan
+./bin-prism/llama-cli -m models/Ternary-Bonsai-27B-Q2_0.gguf ...
+
+uv run "$S" --bin ./bin latest vulkan
+./bin/llama-cli -m models/Spark-X2.5-4B-Q4_K_M.gguf ...
+```
+
+A fork build typically keeps upstream's asset naming
+(`llama-<tag>-bin-<os>-<backend>-<arch>`), so the installer finds assets by
+filename suffix and the fork's version prefix is irrelevant. Where a fork differs
+— e.g. it publishes `bin-linux-*` instead of `bin-ubuntu-*`, or extra backends like
+`hip-radeon` — the same lookup still resolves it. If a build is not found, the
+installer prints every asset that *does* exist for your OS/arch.
+
+A fork build only knows **its own** formats. If a model fails to load with a
+tensor-offset error, check [caveats.md](caveats.md) before blaming the download.
 
 ## Automatic backend choice
 
-`scripts/detect-system.py` already reports a GPU backend per device (`cuda` / `vulkan`).
-Wire it in — map detect labels to published assets (`cuda` -> `cuda-12.4`):
+`scripts/detect-system.py` reports a GPU backend per device (`cuda` / `vulkan`).
+Wire it in — map detect labels to published assets (`cuda` → `cuda-12.4`):
 
 ```bash
-# picks the first non-CPU GPU backend, falls back to cpu
 BACKEND="$(uv run scripts/detect-system.py | uv run python -c '
 import json,sys
 g=json.load(sys.stdin).get("gpus",[])
 b=next((x["backend"] for x in g if x["backend"]!="unknown"),"cpu")
 print("cuda-12.4" if b=="cuda" else b)')"
-uv run scripts/install-llama.py latest "${BACKEND:-cpu}"
+uv run "$S" --bin ./bin latest "${BACKEND:-cpu}"
 ```
