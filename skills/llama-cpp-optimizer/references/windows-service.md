@@ -110,6 +110,57 @@ servy-cli install -n llama-cpp `
   --startupType Automatic
 ```
 
+## Multiple instances: one service per build
+
+Two independent layers — this is the part that gets conflated:
+
+| Layer | Scope |
+|-------|-------|
+| `presets.ini` (`--models-preset`) | **per server instance** — lists the models *that* instance serves. It is not a registry of instances and knows nothing about ports. |
+| Servy service | **per process** — `install -n <name>` registers one service that runs one exe. The name must be **unique**. |
+
+So N builds → N `bin` folders → N INIs → N services → N ports. One instance per build,
+several models per instance (see [portable-setup.md § Endpoints](portable-setup.md#endpoints-one-server-instance-per-build)).
+
+| Instance | `-p` exe | INI | `--port` | `-n` service | `--startupDir` |
+|----------|----------|-----|----------|--------------|----------------|
+| upstream | `...\bin\llama-server.exe` | `presets-main.ini` | 8080 | `llama-cpp` | `...\bin` |
+| Prism fork | `...\bin-prismml-eng\llama-server.exe` | `presets-prism.ini` | 8081 | `llama-cpp-prism` | `...\bin-prismml-eng` |
+
+```powershell
+$root = "C:\PortableApps\llama-cpp"
+
+servy-cli install -n llama-cpp `
+  -p "$root\bin\llama-server.exe" `
+  --startupDir "$root\bin" `
+  "--params=--models-preset presets-main.ini --port 8080 --host 127.0.0.1 --log-disable" `
+  --startupType Automatic
+
+servy-cli install -n llama-cpp-prism `
+  -p "$root\bin-prismml-eng\llama-server.exe" `
+  --startupDir "$root\bin-prismml-eng" `
+  "--params=--models-preset presets-prism.ini --port 8081 --host 127.0.0.1 --log-disable" `
+  --startupType Automatic
+```
+
+Control and remove each by its own name:
+
+```powershell
+servy-cli restart   -n llama-cpp
+servy-cli restart   -n llama-cpp-prism
+servy-cli uninstall -n llama-cpp-prism
+```
+
+**Gotchas**
+
+- `-n` must be unique. Reusing an existing name **updates** that service instead of adding
+  another — a second `install -n llama-cpp` silently reconfigures the first.
+- `--startupDir` is the process working directory, so a relative `--models-preset presets-main.ini`
+  *and* any relative `model = models/...` inside the INI both resolve against it. Keep each INI
+  next to its own exe (as above), or use absolute paths inside the INI.
+- Update each instance independently: copy the new binaries over that folder, then restart that service.
+- `servy-cli export` a service before changing it, so the definition can be diffed or restored.
+
 ## Control
 
 ```powershell
