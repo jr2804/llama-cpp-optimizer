@@ -6,7 +6,7 @@ Production deployment patterns for `llama-server` with OpenAI-compatible API.
 
 ## Multiple Models: ONE instance, ONE port (router mode)
 
-`llama-server` has a built-in **router mode** that serves multiple models from a single process on a single port. **Never spawn one instance per model** — use `--models-preset` with an INI file instead:
+`llama-server` has a built-in **router mode** that serves multiple models from a single process on a single port. **Never spawn one instance per model** — use `--models-preset` with an INI file instead. (Router mode applies *within one build*; models needing different llama.cpp builds each need their own instance — see [portable-setup.md § Endpoints](portable-setup.md#endpoints-one-server-instance-per-build).)
 
 ```bash
 llama-server --models-preset presets.ini --host 127.0.0.1 --port 8080
@@ -51,6 +51,9 @@ To control VRAM sharing:
 - Set `--models-max 1` (only one model stays loaded; least-recently-used is evicted)
 - Run separate `llama-server` instances on different ports for models that must
   always be GPU-ready simultaneously (see [windows-service.md](windows-service.md)).
+- Run a separate instance per **build** when the models need different llama.cpp builds —
+  a fork's quant/tensor formats are invisible to the upstream binary, and forks usually
+  lag upstream. See [portable-setup.md § Endpoints](portable-setup.md#endpoints-one-server-instance-per-build).
 
 Router-mode behavior:
 

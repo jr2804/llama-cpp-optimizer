@@ -102,8 +102,39 @@ uv run "$S" --bin ./bin latest cuda-12.4    # vulkan -> newest cuda
 ```
 
 `./bin` then holds every llama tool (`llama-cli`, `llama-server`, `llama-bench`, …)
-plus its runtime DLLs. To run several differently-configured instances, keep
-separate folders and select with `LLAMA_BIN`.
+plus its runtime DLLs. Running more than one build at the same time is covered in
+[Endpoints](#endpoints-one-server-instance-per-build).
+
+## Endpoints: one server instance per build
+
+A `llama-server` process **is** one binary — the tensor/quant formats it understands
+are compiled in. A fork build therefore cannot serve a model that needs a different
+build, and router mode (one instance, many models) only works *within one build*.
+
+| What you run | Endpoints |
+|--------------|-----------|
+| Several models, same build | **one** `llama-server`, one port, router mode (`--models-preset`) |
+| Models needing different builds/forks | **one instance per build**, each on its own port |
+
+Specialized forks usually **lag upstream** — they carry the quant kernels but trail on
+new architectures and fixes. So running upstream *and* a fork side by side is the normal
+case, not an edge case: latest architectures from upstream, the specialized quant from
+the fork. Keep each build's folder and its `llama-server` on a distinct port:
+
+| Build | Folder | Port |
+|-------|--------|------|
+| upstream `ggml-org/llama.cpp` | `./bin` | 8080 |
+| Prism fork | `./bin-prismml-eng` | 8081 |
+
+```bash
+./bin/llama-server             --models-preset presets-main.ini  --port 8080
+./bin-prismml-eng/llama-server --models-preset presets-prism.ini --port 8081
+```
+
+Each build gets **its own** `--models-preset` INI. The format is identical, but the
+models and their flags differ — never point one build's INI at models that belong to
+another build. Pin the fork's `VERSION` rather than tracking `latest`, so a fork update
+cannot silently change what an existing endpoint serves.
 
 ## Forks and specialized builds
 
