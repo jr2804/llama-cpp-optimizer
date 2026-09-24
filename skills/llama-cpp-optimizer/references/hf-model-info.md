@@ -111,15 +111,27 @@ This auto-downloads to the Hugging Face cache (`~/.cache/huggingface/hub/`).
 
 ### Via curl (manual, with resume)
 
+The folder under `models/` is the repo **owner**, so the provider stays visible:
+
 ```bash
-curl -L -C - -o models/model.gguf \
-  "https://huggingface.co/<user>/<model>/resolve/main/<file.gguf>"
+mkdir -p models/<owner>
+curl -L -C - -o models/<owner>/<file.gguf> \
+  "https://huggingface.co/<owner>/<repo>/resolve/main/<file.gguf>"
 ```
+
+### Via the download helper (recommended)
+
+```bash
+uv run scripts/download-model.py <owner>/<repo>                     # list files
+uv run scripts/download-model.py <owner>/<repo> --file <file.gguf>  # -> models/<owner>/<file.gguf>
+```
+
+Resumes partial downloads and verifies SHA256.
 
 ### Via Hugging Face Hub CLI
 
 ```bash
-uvx hf. -- download <user>/<model> --include "*.gguf" --local-dir models/
+uvx hf. -- download <owner>/<repo> --include "*.gguf" --local-dir models/<owner>
 ```
 
 ## Model Architecture Detection

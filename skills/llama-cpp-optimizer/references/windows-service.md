@@ -66,7 +66,7 @@ Update routine (after downloading a new release): copy the new `llama-server.exe
 servy-cli install -n llama-cpp-granite `
   -p "C:\PortableApps\llama-cpp\llama-server.exe" `
   --startupDir "C:\PortableApps\llama-cpp" `
-  "--params=--model models/granite-4.1-3b-Q4_K_M.gguf --n-gpu-layers 99 --port 8001 --host 127.0.0.1 --log-disable" `
+  "--params=--model models/unsloth/granite-4.1-3b-Q4_K_M.gguf --n-gpu-layers 99 --port 8001 --host 127.0.0.1 --log-disable" `
   --startupType Automatic
 ```
 

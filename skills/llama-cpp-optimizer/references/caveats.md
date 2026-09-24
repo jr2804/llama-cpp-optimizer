@@ -30,7 +30,7 @@ Checklist before diagnosing a load failure:
 
    ```bash
    curl -sL "https://huggingface.co/<user>/<repo>/raw/main/<file>" | grep oid
-   certutil -hashfile models/<file> SHA256
+   certutil -hashfile models/<owner>/<file> SHA256
    ```
 
 2. **Check the repo README for an upstream-status / compatibility section** — it usually states which build the file needs.

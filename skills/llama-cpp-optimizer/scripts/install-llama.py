@@ -96,7 +96,7 @@ def main() -> None:
         args.bin_dir or os.environ.get("LLAMA_BIN") or str(_default_bin_dir(REPO))
     )
 
-    # No backend arg → list and exit (no destination needed).
+    # No backend arg -> list and exit (no destination needed).
     if args.backend is None:
         tag = args.version
         if tag == "latest":
@@ -196,7 +196,7 @@ def _download(url: str, dest: Path) -> None:
 
 
 def _fetch_releases(limit: int = 30) -> list[dict]:
-    """Newest releases first, prereleases included — that is where the binaries live."""
+    """Newest releases first, prereleases included - that is where the binaries live."""
     return _api_get(f"/repos/{REPO}/releases?per_page={limit}")
 
 

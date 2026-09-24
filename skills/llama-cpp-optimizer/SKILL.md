@@ -151,14 +151,16 @@ llama-server --hf-repo <user>/<model> --hf-file <file.gguf> \
 
 ## Python Scripts
 
-The `scripts/` directory contains three Python scripts that automate the parameter derivation workflow:
+The `scripts/` directory contains these Python scripts:
 
-| Script             | Purpose                                    | Usage                                       |
-| ------------------ | ------------------------------------------ | ------------------------------------------- |
-| `detect-system.py` | Detect system capabilities (GPU, RAM, CPU) | `uv run scripts/detect-system.py`           |
-| `model-info.py`    | Fetch model metadata from Hugging Face     | `uv run scripts/model-info.py <model_id>`   |
-| `derive-params.py` | Derive optimal llama.cpp parameters        | `uv run scripts/derive-params.py --model -` |
-| `bench-model.py`  | Bench a preset: cold + warm tok/s         | `uv run scripts/bench-model.py --preset NAME` |
+| Script              | Purpose                                    | Usage                                         |
+| ------------------- | ------------------------------------------ | --------------------------------------------- |
+| `detect-system.py`  | Detect system capabilities (GPU, RAM, CPU) | `uv run scripts/detect-system.py`             |
+| `model-info.py`     | Fetch model metadata from Hugging Face     | `uv run scripts/model-info.py <model_id>`     |
+| `derive-params.py`  | Derive optimal llama.cpp parameters        | `uv run scripts/derive-params.py --model -`   |
+| `install-llama.py`  | Install/update llama.cpp builds (incl. forks) | `uv run scripts/install-llama.py latest vulkan` |
+| `download-model.py` | Download a GGUF into `models/<owner>/`     | `uv run scripts/download-model.py <owner>/<repo>` |
+| `bench-model.py`    | Bench a preset: cold + warm tok/s          | `uv run scripts/bench-model.py --preset NAME` |
 
 All scripts use inline dependencies (`# /// script` header) and run via `uv run` — no manual dependency management needed.
 
@@ -204,17 +206,33 @@ See [references/moe-optimization.md](references/moe-optimization.md) for MoE-spe
 
 ## Model Download
 
+**Keep the provider in the path: `models/<owner>/<file>.gguf`.** The folder is the HF repo
+owner you downloaded from, so a file stays identifiable afterwards. Never rename a
+download to something generic like `model.gguf` — that erases where it came from.
+
 ```bash
-# Auto-download via HF (built into llama-cli/llama-server)
-llama-cli --hf-repo <user>/<model> --hf-file <file.gguf> --prompt "test" --predict 1
+# list the GGUF files in a repo, with sizes
+uv run scripts/download-model.py bartowski/Ornith-1.5-9B-GGUF
 
-# Manual download with resume support
-curl -L -C - -o models/model.gguf "https://huggingface.co/<user>/<model>/resolve/main/<file.gguf>"
+# download one -> models/bartowski/Ornith-1.5-9B-Q4_K_M.gguf
+uv run scripts/download-model.py bartowski/Ornith-1.5-9B-GGUF --file Ornith-1.5-9B-Q4_K_M.gguf
+```
 
-# Verify SHA256 from LFS pointer
-curl -sL "https://huggingface.co/<user>/<model>/raw/main/<file.gguf>"
+`download-model.py` resumes partial downloads and verifies SHA256 against the repo's LFS
+metadata. By hand, the same layout:
+
+```bash
+mkdir -p models/<owner>
+curl -L -C - -o models/<owner>/<file.gguf> \
+  "https://huggingface.co/<owner>/<repo>/resolve/main/<file.gguf>"
+
+# SHA256 from the LFS pointer
+curl -sL "https://huggingface.co/<owner>/<repo>/raw/main/<file.gguf>"
 # Returns: oid sha256:<hash> / size <bytes>
 ```
+
+`llama-cli --hf-repo <owner>/<repo> --hf-file <file.gguf>` also auto-downloads, but into the
+Hugging Face cache (`~/.cache/huggingface/hub/`), not `models/`.
 
 ## Reference Documents
 
