@@ -181,7 +181,7 @@ servy-cli uninstall -n llama-cpp
 ## Notes
 
 - **Admin required**: `install`/`uninstall` need an elevated shell. Run the CLI from an elevated PowerShell, or wrap it in a `.ps1` and `Start-Process powershell -Verb RunAs`.
-- **`--params` quoting**: pass the whole parameter string as one argument: `"--params=--models-preset presets.ini --port 8001 ..."`. Split args cause "The specified path is invalid." / "unknown option" errors.
+- **`--params` quoting**: use the equals form with the whole parameter string as one argument: `"--params=--models-preset presets.ini --port 8001 ..."`. Passing it as a separate value (`--params "--models-preset ..."`) makes the parser read the value as another option and fail with `ERROR(S): Option '--models-preset presets.ini ...' is unknown.` — the service is then left `NotInstalled`, with the real error only in the install command's own output. Split args cause "The specified path is invalid." / "unknown option" errors.
 - **`--envVars` format**: semicolon-separated `VAR=value` pairs, one argument.
 - **Diagnose failures**: add `--stdout C:\PortableApps\llama-cpp\logs\llama-svc-stdout.log --stderr C:\PortableApps\llama-cpp\logs\llama-svc-stderr.log` to `install` (or the Application event log, provider `Servy`) — the stderr file shows the real mise error (untrusted config, missing binary, etc.).
 - `--log-disable` suppresses console output (logs are otherwise lost without a console window).

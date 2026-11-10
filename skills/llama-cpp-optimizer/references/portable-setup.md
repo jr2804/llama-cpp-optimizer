@@ -136,6 +136,13 @@ models and their flags differ — never point one build's INI at models that bel
 another build. Pin the fork's `VERSION` rather than tracking `latest`, so a fork update
 cannot silently change what an existing endpoint serves.
 
+**Older fork bases ignore `port` in the INI's `[*]` section.** INI port support is recent
+upstream, so a fork built on an older revision happily accepts the INI, reports the model
+list, and then listens on its built-in default (8080) regardless of what the INI says. Pass
+`--port` on the command line for fork instances — that is why the examples above do. The
+symptom is a health check failing on the INI's port while the server is quietly up elsewhere;
+verify against the startup line (`listening on http://...`) rather than trusting the INI.
+
 ## Forks and specialized builds
 
 Some models need a llama.cpp **fork**: the quantization or tensor type is not in

@@ -171,12 +171,13 @@ The derived parameters and run commands combine several techniques for faster in
 | Technique                     | Effect                                                     |
 | ----------------------------- | ---------------------------------------------------------- |
 | `--flash-attn on`             | Faster attention, lower memory (esp. long contexts)        |
-| `--cache-type-k/v q8_0/q4_0`  | Quantize KV cache → lower VRAM, slight quality cost        |
+| `--cache-type-k/v q8_0/q4_0`  | Quantize KV cache → lower VRAM, slight quality cost (f16 only on fork builds whose CUDA lacks MMA FA kernels for your arch — see [caveats.md § 9](references/caveats.md#9-fork-builds-may-lack-kernels-for-your-gpu-architecture)) |
 | `--no-op-offload`             | For hybrid-attention models at *partial* GPU offload: prevents fused kernel from being silently disabled (see [caveats.md](references/caveats.md#4-backend-choice-cuda-vs-vulkan-for-hybrid-attention-models)) |
 | `--cpu-moe`                   | MoE only: keep expert weights in system RAM, offload attention layers to GPU — fits large MoEs (12B+ active) on 8 GB VRAM (see [moe-optimization.md](references/moe-optimization.md)) |
 | `--cpu-moe` / `--n-cpu-moe N` | Keep MoE expert weights in CPU RAM → fit larger MoE models |
 | `--load-mode mmap`            | Memory-map model file → lower RAM footprint, faster load   |
 | `--n-gpu-layers N`            | Offload the right number of layers to GPU                  |
+| `-np 1 -ub 128`               | Single-user local serving: default slots/ubatch cost throughput at large context (measured 6× — see [server-tuning.md § Concurrency Tuning](references/server-tuning.md#concurrency-tuning)) |
 | `--tensor-split N0,N1,...`    | Distribute across multiple GPUs                            |
 
 See [references/moe-optimization.md](references/moe-optimization.md) for MoE-specific tuning and the derivation script for KV cache / layer-offload logic.
@@ -241,4 +242,4 @@ Hugging Face cache (`~/.cache/huggingface/hub/`), not `models/`.
 - [system-capabilities.md](references/system-capabilities.md) — Detecting local system capabilities
 - [parameter-tuning.md](references/parameter-tuning.md) — Deriving optimal parameters from model + system
 - [moe-optimization.md](references/moe-optimization.md) — MoE-specific optimization guide
-- [caveats.md](references/caveats.md) — Fork-format GGUFs, load failures, sidecar confusion
+- [caveats.md](references/caveats.md) — Fork-format GGUFs, fork kernel gaps, load failures, sidecar confusion

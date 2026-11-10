@@ -26,6 +26,17 @@ To run the fork variant next to upstream, install it into its own folder — see
 
 Checklist before diagnosing a load failure:
 
+0. **Fast signal — read the metadata first.** The Python `gguf` reader rejects fork-only
+   tensor types outright, which identifies the file as fork-only in one second:
+
+   ```python
+   from gguf import GGUFReader
+   GGUFReader("models/<owner>/<file>.gguf")
+   # ValueError: np.uint32(143) is not a valid GGMLQuantizationType
+   ```
+
+   A rejection like this = fork-only tensor type (143 is the Prism fork's ternary), and no
+   flag on a mainline build will make it load.
 1. **Verify the download** — compare SHA256 against the repo's LFS pointer:
 
    ```bash
@@ -102,7 +113,7 @@ whenever a hybrid-attention model runs with partial GPU offload. Full offload
 # "github:ggml-org/llama.cpp" = {version = "latest", asset_pattern = "llama-*-vulkan-*"}        # portable
 ```
 
-## 4. Windows CUDA requires the runtime DLLs
+## 5. Windows CUDA requires the runtime DLLs
 
 On Windows, CUDA backend binaries do **not** ship with the CUDA runtime (`cublas*.dll`, `cudart*.dll`). These live in a separate `cudart-llama-*` asset published alongside every release. Both must be extracted to the same directory.
 
@@ -117,7 +128,7 @@ unzip cudart-llama-bin-win-cuda-12.4-x64.zip -d ./bin
 
 On Linux, CUDA is statically linked — no extra download needed.
 
-## 5. VRAM hang: model load freezes indefinitely
+## 6. VRAM hang: model load freezes indefinitely
 
 `llama-cli`/`llama-server` can **hang indefinitely** (no error, no output) when the
 model's required GPU workspace exceeds available VRAM — the process swaps and
@@ -136,7 +147,7 @@ If it hangs or OOMs:
 2. Reduce `-ngl`, or for MoE models use `--cpu-moe` (see [moe-optimization.md](moe-optimization.md)).
 3. Only then raise context size stepwise.
 
-## 6. MTP draft models: two incompatible formats + silent non-engagement
+## 7. MTP draft models: two incompatible formats + silent non-engagement
 
 MTP (Multi-Token Prediction) sidecars come in formats that mainline llama.cpp
 cannot always use:
@@ -154,9 +165,50 @@ Checklist when a drafter doesn't help:
 3. On constrained VRAM, MTP can be **counterproductive**: draft weights + draft KV cache push VRAM past the throttling threshold and generation drops below the no-MTP baseline (measured: 54 → 10 tok/s on 8 GB). Benchmark with and without before keeping it.
 4. Check the model card's "Run with MTP" section for required build/features; if it cites a recent llama.cpp PR, verify your build includes it before promising MTP speedups.
 
-## 7. `-hf` auto-download may hang where the `hf` CLI works
+## 8. `-hf` auto-download may hang where the `hf` CLI works
 
 `llama-server -hf <repo>:<quant>` uses a built-in downloader that can hang on
 restricted networks even though Python's `hf` CLI downloads fine (different HTTP
 stack/proxy handling). Don't burn time debugging it — download with `hf download`
 or `curl` and point `--model` / presets.ini at the local file.
+
+## 9. Fork builds may lack kernels for your GPU architecture
+
+A fork that carries the right *format* can still lack the right *kernels*: fork CUDA builds
+are usually compiled for a narrower set of architectures than upstream, so where mainline
+falls back to a slower path, the fork hard-crashes instead. This is build coverage — not a
+bad model file, and not something you can fix with flags.
+
+Measured — Prism fork (`prism-b10777`) on RTX 2070 (sm_75), ternary Bonsai-2, with
+**quantized KV + `--flash-attn`**:
+
+```text
+ERROR: CUDA kernel flash_attn_ext_f16 has no device code compatible with CUDA arch 750.
+ggml-cuda.cu was compiled for: 500,610,700,750,800,860,890,900
+CUDA error: unspecified launch failure      -> server exits
+```
+
+Quantized-KV flash attention needs the **MMA** FA path; this fork ships no sm_75
+instantiation and, unlike mainline, does not fall back to the vector path (which handles
+f16/bf16 KV only). Fixes: keep `--cache-type-k/v f16`, or turn flash attention off.
+
+The `was compiled for:` list is a fatbin summary — it can include 750 while the *failing
+kernel template* has no 750 instantiation. Treat the kernel name in the message as the truth.
+
+### Context can crater throughput without using more VRAM
+
+On the same fork build, allocating a larger context silently cost **4× throughput**, with
+VRAM *lower* than in the fast configuration — so this is not a memory/throttling effect:
+
+| ctx | 8K | 16K | 24K | 32K | 48K | 64K | 98K |
+|-----|----|-----|-----|-----|-----|-----|-----|
+| gen tok/s | 40.2 | 40.2 | 40.2 | **9.2** | 20.1 | 9.2 | 9.2 |
+| VRAM | 6.65 GB | 7.15 GB | 7.66 GB | 7.92 GB | 7.87 GB | 7.89 GB | 7.95 GB |
+
+Flash attention on *or* off made no difference, and `llama-bench` at a tiny context measured
+**40.2 ± 0.2 tok/s** — i.e. the model's real ceiling; the server was the problem, not the
+hardware. When a fork build shows a step-like throughput drop as context grows, measure
+context stepwise and serve the largest value that still runs at full speed instead of the
+context the model card suggests. Combined with the `-np 1 -ub 128` slot effect
+(see [server-tuning.md § Concurrency Tuning](server-tuning.md#concurrency-tuning)), this is
+worth ~6× on the same model.

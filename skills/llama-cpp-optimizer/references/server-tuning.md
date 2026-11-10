@@ -78,8 +78,8 @@ uv run llama-server \
 ## Concurrency Tuning
 
 ```bash
-# Parallel request slots (default: 1 — serial processing)
-uv run llama-server --parallel-requests 4
+# Parallel request slots (default: -1 = auto; typically 4 on desktop builds)
+uv run llama-server -np 4
 
 # Continuous batching — overlap prompt processing across requests
 uv run llama-server --cont-batching
@@ -87,6 +87,25 @@ uv run llama-server --cont-batching
 # Prompt caching — reuse processed KV cache for repeated prompts
 uv run llama-server --cache-prompt
 ```
+
+### Slots cost throughput, not just memory
+
+Every slot gets its own KV/buffer allocation, so raising `-np` on a VRAM-tight card
+buys concurrency by making **single-stream** generation slower. With a large `ctx-size`
+the effect can be dramatic — same model, same context, only the slot/batch settings differ:
+
+| `-np` / `-ub` | ctx | generation |
+|---------------|-----|------------|
+| 4 / 512 (defaults) | 32768 | 6.9 tok/s |
+| **1 / 128** | 32768 | **40 tok/s** |
+
+Measured on a 27B ternary model (RTX 2070 8GB, Prism fork). For a single-user local
+server — the normal case — pin `-np 1` and a smaller `-ub` (128) rather than accepting
+the auto default. Only raise `-np` when you actually serve concurrent clients and have
+VRAM to spare.
+
+For a fork or model that shows a sudden throughput drop as context grows even though VRAM
+is not the limiter, measure context stepwise (see [caveats.md § 9](caveats.md#9-fork-builds-may-lack-kernels-for-your-gpu-architecture)).
 
 ## OpenAI-Compatible API
 
