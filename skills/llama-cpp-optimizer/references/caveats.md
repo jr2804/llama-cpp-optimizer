@@ -212,3 +212,22 @@ context stepwise and serve the largest value that still runs at full speed inste
 context the model card suggests. Combined with the `-np 1 -ub 128` slot effect
 (see [server-tuning.md § Concurrency Tuning](server-tuning.md#concurrency-tuning)), this is
 worth ~6× on the same model.
+
+## 10. Experimental MoE cache (b12191+): pinned memory flips the trade-off
+
+The MoE cache (`--moe-cache-mib`, see
+[moe-optimization.md § Experimental MoE Cache](moe-optimization.md#experimental-moe-cache-b12191))
+is experimental; its headline gains (up to +50% decode t/s on 8–16 GB cards) come from
+contributor tests, not a settled benchmark matrix. Before adopting:
+
+1. **Pinned vs mmap'd experts decide everything.** The `--moe-cache-cpu-share` fallback
+   helps when host experts are unpinned (the `--load-mode mmap` default); with pinned
+   experts (`-lm mlock` / `-lm none` / `-lm dio`) uploads saturate PCIe and the share
+   often does nothing or is slower.
+2. **Decode only.** Batches above 32 tokens (i.e. prompt processing) bypass the cache and
+   upload every expert anyway — don't judge the feature by prompt speed.
+3. **Always compare against the no-cache baseline** on the same model and context. If the
+   tuner (`scripts/moe-cache-tune.py`) cannot beat it, drop the cache and give the VRAM
+   back to context.
+4. **Model fits in VRAM? Don't use it.** A CPU detour cannot improve a cache miss that
+   never happens.

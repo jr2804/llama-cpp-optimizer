@@ -175,6 +175,7 @@ The derived parameters and run commands combine several techniques for faster in
 | `--no-op-offload`             | For hybrid-attention models at *partial* GPU offload: prevents fused kernel from being silently disabled (see [caveats.md](references/caveats.md#4-backend-choice-cuda-vs-vulkan-for-hybrid-attention-models)) |
 | `--cpu-moe`                   | MoE only: keep expert weights in system RAM, offload attention layers to GPU — fits large MoEs (12B+ active) on 8 GB VRAM (see [moe-optimization.md](references/moe-optimization.md)) |
 | `--cpu-moe` / `--n-cpu-moe N` | Keep MoE expert weights in CPU RAM → fit larger MoE models |
+| `--moe-cache-mib N` / `--moe-cache-cpu-share F` | b12191+ experimental MoE cache: hold hot experts in spare VRAM while the CPU computes part of the misses → up to +50% decode tok/s on 8–16 GB cards (see [moe-optimization.md](references/moe-optimization.md#experimental-moe-cache-b12191)) |
 | `--load-mode mmap`            | Memory-map model file → lower RAM footprint, faster load   |
 | `--n-gpu-layers N`            | Offload the right number of layers to GPU                  |
 | `-np 1 -ub 128`               | Single-user local serving: default slots/ubatch cost throughput at large context (measured 6× — see [server-tuning.md § Concurrency Tuning](references/server-tuning.md#concurrency-tuning)) |

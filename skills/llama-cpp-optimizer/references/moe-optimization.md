@@ -65,6 +65,72 @@ llama-server --model model.gguf --load-mode mlock
 - Prevents swapping/paging during inference
 - Uses more RAM but gives more consistent performance
 - **Use if:** you have enough RAM and want maximum speed
+- **MoE cache interaction:** pinned experts upload at full PCIe speed, so
+  `--moe-cache-cpu-share` usually does not help here (see
+  [Experimental MoE Cache](#experimental-moe-cache-b12191) below)
+
+## Experimental MoE Cache (b12191+)
+
+When experts are kept in CPU RAM (`--cpu-moe`, `--n-cpu-moe`, or `-ot`), an
+experimental cache can hold the **most-used experts in VRAM**. Cache hits run on
+the GPU; only misses pay the PCIe cost. Requires llama.cpp **b12191 or newer**
+and spare VRAM beyond what the layers and KV cache use.
+
+| Flag                              | Meaning                                                                                                                    | Default    |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `--moe-cache-mib N`               | VRAM cache size in MiB for the CPU-resident experts; split across GPUs like `--tensor-split`                                 | 0 (off)    |
+| `--moe-cache-cpu-share F`         | Share (0–1) of the cache misses the CPU computes from host RAM instead of uploading — applies only once the cache is full    | 0          |
+
+```bash
+llama-server --model model.gguf --n-gpu-layers 99 --cpu-moe \
+  --moe-cache-mib 3072 --moe-cache-cpu-share 0.95
+```
+
+**When the CPU share pays off** — the CPU must read host experts faster than
+the GPU can upload them:
+
+- Fast system RAM, slower PCIe links, and **unpinned (mmap'd) experts** — the
+  `--load-mode mmap` default — all favor the CPU route
+- With pinned experts (`--load-mode mlock`, `-lm none`, `-lm dio`) uploads run
+  at full link speed; the CPU share often does nothing or is slower
+- Benefits **decode only** (batches of ≤ 32 tokens); large prompt batches
+  bypass the cache and upload every expert they use — judge it by generation
+  speed after the cache warms, not prompt processing
+- The hybrid frequency-and-recency replacement policy that ships with the same
+  build is worth ~6–7% decode speed and 8% fewer uploads on its own
+
+**Contributor-measured gains** (pre-merge branches, one config each —
+indicative, not guaranteed):
+
+| GPU                             | Baseline   | Cache + share 0.95 | Gain  |
+| ------------------------------- | ---------- | ------------------ | ----- |
+| RTX 3070 8GB (3.1 GiB cache)    | 41.0 t/s   | 62.4 t/s           | +52%  |
+| RTX 2080 Ti 11GB                | 42.1 t/s   | 64.5 t/s           | +53%  |
+| RTX 5060 Ti 16GB                | 44.2 t/s   | 61.1 t/s           | +38%  |
+
+(RTX 2080 Ti / 5060 Ti baselines are with the MoE cache disabled entirely.)
+
+### Don't tune by hand — use the upstream tuner
+
+The tuner ships with the llama.cpp source (`scripts/moe-cache-tune.py`):
+
+```bash
+python3 scripts/moe-cache-tune.py -- build/bin/llama-server -m model.gguf -cmoe -t 8 -c 32768
+```
+
+- Runs the server **6 times** (2 cache sizes × CPU shares 0 / 0.5 / 0.95),
+  generates a few thousand tokens, fits the machine's upload and CPU speeds,
+  and recommends the **lowest share within 5% of the predicted fastest** config
+- Keep your own `-t`, `-c` and expert-placement flags in the server command —
+  the measured speeds and free VRAM depend on them
+- Results are cached in `--out` (default `moe-cache-tune/`) and reused while
+  the command is unchanged, so re-tuning with `--max-mib` is instant
+- If all experts fit in VRAM it says so — then drop `--cpu-moe` instead
+
+**Skip the cache entirely if** the model already fits in VRAM (a CPU detour
+cannot improve a miss that never happens) or the tuner cannot beat the
+no-cache baseline on your model — reclaim the VRAM for context instead. See
+also [caveats.md § 10](caveats.md#10-experimental-moe-cache-b12191-pinned-memory-flips-the-trade-off).
 
 ## VRAM Budget Calculation
 

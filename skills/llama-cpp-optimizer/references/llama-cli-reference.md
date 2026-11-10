@@ -43,6 +43,8 @@ These flags work across `llama-cli`, `llama-server`, `llama-bench`, and most oth
 | `-ts, --tensor-split N0,N1,...` | Fraction per GPU (comma-separated) | 0 |
 | `-cmoe, --cpu-moe` | Keep ALL MoE expert weights in CPU | off |
 | `-ncmoe, --n-cpu-moe N` | Keep first N layers' MoE experts in CPU | — |
+| `--moe-cache-mib N` | VRAM cache (MiB) for CPU-resident MoE experts (b12191+, experimental) | 0 (off) |
+| `--moe-cache-cpu-share F` | Share (0–1) of MoE cache misses computed on CPU once the cache is full (b12191+) | 0.00 |
 | `-ctk, --cache-type-k <type>` | KV cache type for K | `f16` |
 | `-ctv, --cache-type-v <type>` | KV cache type for V | `f16` |
 | `--kv-offload, --no-kv-offload` | Enable KV cache offloading | enabled |
@@ -201,6 +203,8 @@ Multiple values can be given per parameter by separating with `,` or by specifyi
 | `LLAMA_ARG_FLASH_ATTN` | All | Flash Attention |
 | `LLAMA_ARG_CPU_MOE` | All | CPU MoE offloading |
 | `LLAMA_ARG_N_CPU_MOE` | All | N layers CPU MoE |
+| `LLAMA_ARG_MOE_CACHE_MIB` | All | MoE cache size (MiB) |
+| `LLAMA_ARG_MOE_CACHE_CPU_SHARE` | All | MoE cache CPU share |
 | `LLAMA_ARG_CACHE_TYPE_K` | All | KV cache type K |
 | `LLAMA_ARG_CACHE_TYPE_V` | All | KV cache type V |
 | `LLAMA_ARG_KV_OFFLOAD` | All | KV cache offloading |
