@@ -8,16 +8,15 @@ bun = "latest"
 
 # web search tools
 "github:1broseidon/ketch" = "latest"
-"pipx:hound-mcp" = { version = "latest", extras = ["all"] }
 
 # python tools
-"pipx:git+https://codeberg.org/jr2804/clean-sort.git" = "latest"
+"pypi:pyreorder" = "latest"
 ruff = "latest"
 ty = "latest"
-"pipx:codespell" = "latest"
+"pypi:codespell" = "latest"
 
 [settings.npm]
 package_manager = "bun"
 
-[settings.pipx]
+[settings.pypi]
 uvx = true
